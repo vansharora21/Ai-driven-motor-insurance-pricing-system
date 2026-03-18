@@ -1,0 +1,51 @@
+Timestamp,Email address,Driver Identifier (Email or Unique ID),Age (Must be between 18 and 100),Vehicle Type,How old is your vehicle (in years)?,"On average, how many kilometers do you drive per day?",Night Driving Frequency (10 PM – 5 AM),Harsh Braking Frequency (How often do you brake abruptly in traffic?),How many traffic accidents have you been involved in during the last 2 years?,Have you filed a motor insurance claim in the last 2 years?,How many years of driving experience do you have?
+18/03/2026 01:13:36,vansharora4903@gmail.com,,23,Sedan,4,3000,Medium (Occasionally),Medium (Occasionally),2,Yes,4
+18/03/2026 01:14:07,ishapatidar61@gmail.com,,19,SUV,3,10,Low (Rarely),Medium (Occasionally),0,No,1
+18/03/2026 01:14:10,devsantoriya818@gmail.com,,19,SUV,4,25,Low (Rarely),Low (Rarely),0,Yes,5
+18/03/2026 01:21:07,karnstuti107@gmail.com,,20,SUV,2,0,Low (Rarely),Medium (Occasionally),None,No,1
+18/03/2026 01:23:17,hggautam0088@gmail.com,,20,Other,4,5,Medium (Occasionally),Medium (Occasionally),0,No,7
+18/03/2026 01:38:49,prakharraj805@gmail.com,,24,Sedan,12,30,Low (Rarely),Low (Rarely),0,No,6
+18/03/2026 04:59:28,lerh3183@gmail.com,,20,Motorcycle,2,20,Medium (Occasionally),Low (Rarely),0,No,2
+18/03/2026 07:33:17,udaiveersingh7620@gmail.com,,21,Motorcycle,2,25,Low (Rarely),High (Frequently),3-4,Yes,6 years
+18/03/2026 07:54:59,harshitstark22@gmail.com,,19,SUV,11,8,Low (Rarely),Medium (Occasionally),0,Yes,2
+18/03/2026 07:55:03,mahibvbvpn1815@gmail.com,,19,Other,7,20-25,Low (Rarely),Medium (Occasionally),2,No,3
+18/03/2026 09:40:38,sjisgreat234@gmail.com,,21,SUV,0,20,Low (Rarely),Medium (Occasionally),1,Yes,4
+18/03/2026 09:43:54,gs890966@gmail.com,,23,Motorcycle,1 year,30,Medium (Occasionally),Low (Rarely),1,No,5
+18/03/2026 09:47:01,bhavyapancholi2007@gmail.com,,18,Motorcycle,11,15,Low (Rarely),Medium (Occasionally),0,No,4
+18/03/2026 10:02:46,kumhar.ashok2004@gmail.com,,22,Other,2 years,22 km,Low (Rarely),Medium (Occasionally),2-3 ,Yes,5 years
+18/03/2026 10:08:47,priyansh34dp@gmail.com,,20,SUV,3,10,Medium (Occasionally),Low (Rarely),0,Yes,1
+18/03/2026 10:13:26,animeshthakur147@gmail.com,,20,Motorcycle,4,30,Medium (Occasionally),High (Frequently),1,No,5
+18/03/2026 10:22:59,karangurjar0047@gmail.com,,22,Motorcycle,2 years ,4 5 ,High (Frequently),High (Frequently),4,No,4
+18/03/2026 11:06:32,mashok0129@gmail.com,,45,SUV,11,8,Medium (Occasionally),Medium (Occasionally),1,Yes,13
+18/03/2026 11:26:39,devendraverma797@gmail.com,,22,Motorcycle,17,20,Low (Rarely),Medium (Occasionally),0,No,5
+18/03/2026 11:43:32,utkarshpareekss@gmail.com,,20,Hatchback,10,10,Medium (Occasionally),Low (Rarely),0,No,3
+18/03/2026 11:47:24,navyakhandelwal80@gmail.com,,21,Other,6,5,Low (Rarely),High (Frequently),1,No,5
+18/03/2026 12:01:18,aj60449388@gmail.com,,18,Motorcycle,1,30,Low (Rarely),Low (Rarely),730,Yes,18
+18/03/2026 12:02:20,usomya23@gmail.com,,21,Other,7,10-15,Low (Rarely),Low (Rarely),1,No,5
+18/03/2026 12:26:00,harshawasthilko@gmail.com,,18,SUV,4,45,Medium (Occasionally),High (Frequently),0,No,5
+18/03/2026 12:39:29,tanmayboss06@gmail.com,,20,Motorcycle,6,20,Low (Rarely),High (Frequently),0,Yes,5
+18/03/2026 12:43:05,kaustubhbairagi975@gmail.com,,21,SUV,5 years ,5 km ,High (Frequently),High (Frequently),2,Yes,4
+18/03/2026 12:44:26,sameerghate05@gmail.com,,21,Motorcycle,5 years ,5 Km,High (Frequently),Low (Rarely),Never,Yes,4 years
+18/03/2026 12:45:42,rishibairaagi.7724@gmail.com,,99,Hatchback,50 years ,400,High (Frequently),Low (Rarely),90,No,110
+18/03/2026 12:46:15,uu5882236@gmail.com,,50,Other,30 years ,200 KM,High (Frequently),Low (Rarely),10-15 accidents,No,30 years
+18/03/2026 12:46:46,lokeshbairagi9691@gmail.com,,22,Sedan,20,50,Medium (Occasionally),Low (Rarely),0,Yes,15
+18/03/2026 12:47:50,dhruvanksri2006@gmail.com,,69,Motorcycle,55,390,High (Frequently),Low (Rarely),350,No,45
+18/03/2026 13:22:07,satvikmishrayt19@gmail.com,,20,Motorcycle,1,20,Medium (Occasionally),Low (Rarely),0,No,9
+18/03/2026 13:23:10,dubeydhruv193@gmail.com,,21,Motorcycle,6 month,40km,Medium (Occasionally),Low (Rarely),0,No,4
+18/03/2026 13:23:27,satvik.m195@gmail.com,,21,Hatchback,7,10,Medium (Occasionally),Low (Rarely),0,Yes,3
+18/03/2026 13:23:42,deswal.deepanshu152@gmail.com,,20,Motorcycle,0.0833,20,Medium (Occasionally),Low (Rarely),Nil,No,5 years
+18/03/2026 13:30:23,sarthakpatrikar2007@gmail.com,,18,Motorcycle,1,3-5,Low (Rarely),Medium (Occasionally),1,No,1 year
+18/03/2026 13:30:32,ashvikayay@gmail.com,,18,Sedan,10,5,Low (Rarely),Low (Rarely),0,No,1
+18/03/2026 13:30:56,divyanshsharma7117@gmail.com,,20,Sedan,,30,Low (Rarely),Medium (Occasionally),1,Yes,2
+18/03/2026 13:49:48,vansh2708jain@gmail.com,,20,Motorcycle,4,30,Medium (Occasionally),Medium (Occasionally),Nil,No,7
+18/03/2026 13:50:40,vansh2708jain@gmail.com,,18,Motorcycle,4,30,Medium (Occasionally),Medium (Occasionally),Nil,No,7
+18/03/2026 13:51:06,harshpatidar2105@gmail.com,,18,Sedan,1,19,Medium (Occasionally),Low (Rarely),5,Yes,5
+18/03/2026 13:53:53,lakshyanetam83@gmail.com,,19,Hatchback,5 year ,25000 km,Medium (Occasionally),Medium (Occasionally),1,No,5
+18/03/2026 14:27:19,tanmaykhandelwalbvb0346@gmail.com,,20,Motorcycle,1 year ,30,Low (Rarely),Medium (Occasionally),0,No,2
+18/03/2026 14:45:13,suryanshshandilya1712@gmail.com,,21,Sedan,,10,Medium (Occasionally),High (Frequently),1,No,4
+18/03/2026 15:12:10,jaydivate1806@gmail.com,,19,Motorcycle,4,30,Low (Rarely),Low (Rarely),0,No,4
+18/03/2026 15:43:06,varuntyagi153406@gmail.com,,19,SUV,3 years,30,Medium (Occasionally),Medium (Occasionally),0,No,2 years
+18/03/2026 15:48:27,pratibhasoni757@gmail.com,,22,Other,10,3,Low (Rarely),Medium (Occasionally),0,No,10
+18/03/2026 17:50:37,anilika3133@gmail.com,,50,Motorcycle,8 years,10,Medium (Occasionally),Low (Rarely),Nil,Yes,30
+18/03/2026 18:02:26,tuhinshu28mohan1@gmail.com,,20,Motorcycle,1,20,Medium (Occasionally),Medium (Occasionally),0,No,3
+18/03/2026 19:09:39,jainanimesh477@gmail.com,,21,SUV,7,8,Low (Rarely),Low (Rarely),0,No,4

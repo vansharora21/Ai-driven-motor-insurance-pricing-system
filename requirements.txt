@@ -1,0 +1,13 @@
+pandas
+numpy
+scikit-learn
+statsmodels
+matplotlib
+seaborn
+plotly
+faker
+sdv
+xgboost
+lightgbm
+jupyter
+streamlit
