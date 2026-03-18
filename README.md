@@ -1,78 +1,82 @@
-# GenAI Motor Insurance Pricing Pipeline
+<h1 align="center">🚗 GenAI Motor Insurance Pricing Engine</h1>
 
-A Generative AI-driven motor insurance pricing system that predicts personalized insurance premiums using driver behavior data and statistical risk models. Designed to simulate dynamic pricing scenarios for urban traffic conditions.
+<p align="center">
+  <img src="https://img.shields.io/badge/Python-3.10+-blue.svg" alt="Python Version">
+  <img src="https://img.shields.io/badge/Framework-Streamlit-red.svg" alt="Streamlit">
+  <img src="https://img.shields.io/badge/Machine%20Learning-Actuarial%20Science-green.svg" alt="ML Models">
+</p>
 
-## Project Structure
+## 📖 Overview
+
+The **GenAI Motor Insurance Pricing Engine** is a state-of-the-art actuarial pipeline designed to calculate dynamic, fair, and highly personalized motor insurance premiums. Moving away from static, demographic-driven pricing matrices, this engine ingests driver behavioral data (telematics) to directly compute statistical expected loss.
+
+### ✨ Key Features
+* 📊 **Actuarial Machine Learning**: Utilizes **Poisson regression** to predict accident frequency and a **Gamma distribution** model to forecast claim severity.
+* 🤖 **Unsupervised Fraud Detection**: Employs an **Isolation Forest** to autonomously flag anomalies and mathematically highly unlikely risk vs. premium assignments.
+* 🌐 **Interactive Web Dashboard**: Features a full **Streamlit UI** allowing you to input user behaviors on the fly, process batch CSV files, and generate interactive visual reports.
+* 🏙️ **Dynamic Scenario Stress Testing**: Run programmatic simulations (e.g., "High Urban Congestion") to observe how environmental shifts dynamically recalculate total portfolio reserves.
+* 🧬 **Synthetic Data Layer (SDV)**: Generate statistically identical, privacy-compliant synthetic populations based on real base-data.
+
+---
+
+## 🚀 Live Web Application (Streamlit)
+
+You can launch the integrated frontend directly to interface with the pricing models.
+
+### How to Run Locally
+
+```bash
+# 1. Install all dependencies
+pip install -r requirements.txt
+
+# 2. Launch the Streamlit server
+streamlit run app.py
+```
+*The app will automatically open in your browser at `http://localhost:8501`. Here you can calculate premiums for single drivers, or upload a CSV in the "Batch Risk Analyzer" tab.*
+
+---
+
+## 🏗️ Project Architecture
 
 ```
 genai-insurance-pricing/
+├── app.py                           # 🟢 Streamlit Web Application Interface
 ├── data/
-│   ├── drivers.csv                  # The input dataset of driver events
-│   └── synthetic_drivers.csv        # The generated synthetic dataset
+│   └── drivers.csv                  # 📂 Input telematics cohort data
 ├── notebooks/
-│   ├── analysis.ipynb               # Interactive pipeline notebook
-│   └── analysis_out.ipynb           # Pre-executed pipeline outputs
+│   └── analysis.ipynb               # 📓 Jupyter execution flow
 ├── results/
-│   ├── plots/                       # Generated distributions and charts
-│   └── premium_reports/             # Final computed premium csv reports
+│   ├── plots/                       # 📈 Auto-rendered distribution & anomaly PNGs
+│   └── premium_reports/             # 📑 Final output of priced drivers
 ├── src/
-│   ├── data_loader.py               # Data ingestion & basic formatting
-│   ├── feature_engineering.py       # Creating risk scores
-│   ├── frequency_model.py           # Poisson regression accident modeling
-│   ├── severity_model.py            # Gamma distribution claim modeling
-│   ├── synthetic_data_generator.py  # GenAI driven simulated users (SDV)
-│   ├── fraud_detection.py           # Anomaly detector (Isolation Forest)
-│   ├── pricing_engine.py            # Calculates final premiums
-│   ├── simulation.py                # Stresses system via urban traffic rules
-│   └── visualization.py             # Generates analytical plots
-├── generate_mock_data.py            # Utility script for creating base datasets
-└── requirements.txt                 # Project dependencies
+│   ├── feature_engineering.py       # ⚙️ Indexing models & behavioral weights
+│   ├── frequency_model.py           # 🧠 Poisson count regression
+│   ├── severity_model.py            # 🧠 Gamma continuous distribution
+│   ├── pricing_engine.py            # 💰 Final load logic & premium computation
+│   ├── simulation.py                # 🏙️ Environmental stress testing modules
+│   ├── fraud_detection.py           # 🕵️ Isolation forest analyzer
+│   └── visualization.py             # 🖼️ Matplotlib/Seaborn visualization layer
+├── generate_mock_data.py            # 🛠️ Utility script for building base SDV distributions
+├── run_pipeline.py                  # 🚀 Fast CLI tool to execute the whole stack headless
+└── requirements.txt                 # 📦 Pinned ML environment variables
 ```
 
-## Setup Instructions
+---
 
-1. **Install Dependencies**:
-   Ensure you have Python installed, then run the following command in your terminal or command prompt:
-   ```bash
-   pip install -r requirements.txt
-   ```
+## 🛠️ Usage via CLI (Headless Mode)
 
-## Using Your Own Data
+If you wish to bypass the GUI and run the pricing models across the entire `drivers.csv` database, dumping the generated CSV reports and PNGs directly to the `results/` folder:
 
-To use your own driver data:
-1. Replace `drivers.csv` inside the `data/` folder with your own file.
-2. Ensure your CSV file has the following columns:
-   - `driver_id` (String)
-   - `age` (Integer)
-   - `vehicle_type` (String)
-   - `vehicle_age` (Integer)
-   - `daily_mileage` (Integer)
-   - `night_driving_level` ('Low', 'Medium', 'High')
-   - `harsh_braking_level` ('Low', 'Medium', 'High')
-   - `accidents_last_2yr` (Integer)
-   - `claim_history` (0 or 1)
-
-## Running the Pipeline
-
-You have two main ways to execute the motor insurance pricing pipeline:
-
-### Option A: Using the Jupyter Notebook (Recommended)
-
-This is the best way to visualize each step sequentially and interact with the pipeline outputs.
-
-1. Launch Jupyter Notebook via terminal or command prompt:
-   ```bash
-   jupyter notebook
-   ```
-2. In your browser, open `notebooks/analysis.ipynb`.
-3. Run all cells to process the data, train the models, and view the outputs.
-
-### Option B: Running the Standalone Scripts
-
-If you want to run specific pieces of the architecture individually, you can invoke the modules directly from the `src` folder. 
-
-Example: Running the fraud detection module separately:
 ```bash
-python src/fraud_detection.py
+# Execute the entire script headless:
+python run_pipeline.py
 ```
-*(Ensure you are running these from the root project folder so paths resolve correctly)*
+
+---
+
+## 💳 Data Schema (Using Your Own Data)
+
+To test the engine with custom cohorts, ensure your input CSV headers exactly match:
+`driver_id, age, vehicle_type, vehicle_age, daily_mileage, night_driving_level, harsh_braking_level, accidents_last_2yr, claim_history`
+
+*Note: The Streamlit **Batch Risk Analyzer** tab handles the injection and cleanup of custom CSV inputs natively.*
