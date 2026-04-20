@@ -46,6 +46,7 @@ def _build_metadata(
     modeling_config: dict[str, object],
     random_seed: int,
 ) -> dict[str, object]:
+    """Build metadata bundle required for reproducible inference and UI defaults."""
     defaults = build_default_metadata(policy_df)
 
     return {
@@ -91,12 +92,14 @@ def main() -> None:
     policy_df, severity_df, data_quality = prepare_model_datasets()
 
     print("Splitting frequency and severity training sets...")
+    # Frequency model uses policy-level claim counts, stratified by claim occurrence.
     frequency_train, frequency_test = train_test_split(
         policy_df,
         test_size=float(evaluation_config["test_size"]),
         random_state=random_seed,
         stratify=policy_df["has_claim"],
     )
+    # Severity model uses claim-level paid amounts and does not require stratification.
     severity_train, severity_test = train_test_split(
         severity_df,
         test_size=float(evaluation_config["test_size"]),
@@ -121,6 +124,7 @@ def main() -> None:
     frequency_model = train_frequency_model(policy_df)
     severity_model = train_severity_model(severity_df)
 
+    # Portfolio baselines stabilize relativities and risk scores across prediction batches.
     portfolio_frequency = predict_frequency(frequency_model, policy_df)
     portfolio_severity = predict_severity(severity_model, policy_df)
     portfolio_baselines = compute_portfolio_baselines(

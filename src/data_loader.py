@@ -47,6 +47,7 @@ class DataValidationError(ValueError):
 
 
 def _validate_columns(df: pd.DataFrame, required_columns: list[str], dataset_name: str) -> None:
+    """Ensure all required columns exist before any type coercion or modeling steps."""
     missing_columns = [column for column in required_columns if column not in df.columns]
     if missing_columns:
         raise DataValidationError(
@@ -56,6 +57,7 @@ def _validate_columns(df: pd.DataFrame, required_columns: list[str], dataset_nam
 
 
 def _validate_numeric_columns(df: pd.DataFrame, numeric_columns: list[str], dataset_name: str) -> None:
+    """Ensure numeric columns are not entirely non-numeric after coercion."""
     non_numeric_columns: list[str] = []
     for column in numeric_columns:
         converted = pd.to_numeric(df[column], errors="coerce")
@@ -74,6 +76,7 @@ def _validate_missing_values(
     dataset_name: str,
     allow_missing: set[str] | None = None,
 ) -> None:
+    """Reject missing values in required columns unless explicitly allowed."""
     allow_missing = allow_missing or set()
     missing_counts = {
         column: int(df[column].isna().sum())
@@ -94,7 +97,7 @@ def validate_dataframe_schema(
     numeric_columns: list[str],
     allow_missing: set[str] | None = None,
 ) -> None:
-    """Validate required columns, numeric dtypes, and missing values for a dataframe."""
+    """Validate schema consistency for datasets used in training or inference."""
     _validate_columns(df, required_columns, dataset_name)
     _validate_numeric_columns(df, numeric_columns, dataset_name)
     _validate_missing_values(df, required_columns, dataset_name, allow_missing=allow_missing)
@@ -125,50 +128,58 @@ def load_severity_data(filepath: str | Path = DEFAULT_SEVERITY_PATH) -> pd.DataF
 
 
 def clean_frequency_data(df: pd.DataFrame) -> pd.DataFrame:
-    """Clean the policy-level frequency data and make it modeling-ready."""
-    df = df.copy()
-    _validate_columns(df, FREQUENCY_REQUIRED_COLUMNS, "Frequency dataset")
+    """
+    Clean policy-level frequency data and return model-ready policy records.
+
+    Cleaning rules are intentionally conservative:
+    - numeric columns are coerced with explicit clipping/filling
+    - categorical fields are normalized to non-empty strings
+    - engineered features are added through a single shared transformation path
+    """
+    frequency_df = df.copy()
+    _validate_columns(frequency_df, FREQUENCY_REQUIRED_COLUMNS, "Frequency dataset")
 
     numeric_columns = [POLICY_ID_COLUMN, FREQUENCY_TARGET, EXPOSURE_COLUMN, "VehPower", "VehAge", "DrivAge", "BonusMalus", "Density"]
     for column in numeric_columns:
-        df[column] = pd.to_numeric(df[column], errors="coerce")
+        frequency_df[column] = pd.to_numeric(frequency_df[column], errors="coerce")
 
-    df[POLICY_ID_COLUMN] = df[POLICY_ID_COLUMN].round().astype("Int64")
-    df = df.dropna(subset=[POLICY_ID_COLUMN]).copy()
-    df[POLICY_ID_COLUMN] = df[POLICY_ID_COLUMN].astype(int)
+    frequency_df[POLICY_ID_COLUMN] = frequency_df[POLICY_ID_COLUMN].round().astype("Int64")
+    frequency_df = frequency_df.dropna(subset=[POLICY_ID_COLUMN]).copy()
+    frequency_df[POLICY_ID_COLUMN] = frequency_df[POLICY_ID_COLUMN].astype(int)
 
-    df[FREQUENCY_TARGET] = df[FREQUENCY_TARGET].fillna(0).clip(lower=0).round().astype(int)
-    df[EXPOSURE_COLUMN] = df[EXPOSURE_COLUMN].fillna(1.0).clip(lower=EXPOSURE_LOWER_BOUND)
+    frequency_df[FREQUENCY_TARGET] = frequency_df[FREQUENCY_TARGET].fillna(0).clip(lower=0).round().astype(int)
+    # Exposure is clipped to a positive floor to avoid divide-by-zero during frequency modeling.
+    frequency_df[EXPOSURE_COLUMN] = frequency_df[EXPOSURE_COLUMN].fillna(1.0).clip(lower=EXPOSURE_LOWER_BOUND)
 
     for column in CATEGORICAL_FEATURES:
-        df[column] = df[column].fillna("Unknown").astype(str).str.strip()
-        df.loc[df[column] == "", column] = "Unknown"
+        frequency_df[column] = frequency_df[column].fillna("Unknown").astype(str).str.strip()
+        frequency_df.loc[frequency_df[column] == "", column] = "Unknown"
 
-    cleaned = engineer_features(df)
+    cleaned = engineer_features(frequency_df)
     cleaned["has_claim"] = (cleaned[FREQUENCY_TARGET] > 0).astype(int)
     cleaned["observed_claim_frequency"] = cleaned[FREQUENCY_TARGET] / cleaned[EXPOSURE_COLUMN]
     return cleaned
 
 
 def clean_severity_data(df: pd.DataFrame) -> pd.DataFrame:
-    """Clean the claim-level severity data."""
-    df = df.copy()
-    _validate_columns(df, SEVERITY_REQUIRED_COLUMNS, "Severity dataset")
+    """Clean claim-level severity data and keep strictly positive paid claims."""
+    severity_df = df.copy()
+    _validate_columns(severity_df, SEVERITY_REQUIRED_COLUMNS, "Severity dataset")
 
-    df[POLICY_ID_COLUMN] = pd.to_numeric(df[POLICY_ID_COLUMN], errors="coerce").round().astype("Int64")
-    df[SEVERITY_TARGET] = pd.to_numeric(df[SEVERITY_TARGET], errors="coerce")
-    df = df.dropna(subset=[POLICY_ID_COLUMN, SEVERITY_TARGET]).copy()
-    df[POLICY_ID_COLUMN] = df[POLICY_ID_COLUMN].astype(int)
-    df[SEVERITY_TARGET] = df[SEVERITY_TARGET].clip(lower=0)
-    df = df[df[SEVERITY_TARGET] > 0].copy()
-    return df
+    severity_df[POLICY_ID_COLUMN] = pd.to_numeric(severity_df[POLICY_ID_COLUMN], errors="coerce").round().astype("Int64")
+    severity_df[SEVERITY_TARGET] = pd.to_numeric(severity_df[SEVERITY_TARGET], errors="coerce")
+    severity_df = severity_df.dropna(subset=[POLICY_ID_COLUMN, SEVERITY_TARGET]).copy()
+    severity_df[POLICY_ID_COLUMN] = severity_df[POLICY_ID_COLUMN].astype(int)
+    severity_df[SEVERITY_TARGET] = severity_df[SEVERITY_TARGET].clip(lower=0)
+    severity_df = severity_df[severity_df[SEVERITY_TARGET] > 0].copy()
+    return severity_df
 
 
 def aggregate_severity_by_policy(severity_df: pd.DataFrame) -> pd.DataFrame:
     """Aggregate total claim amount by policy for portfolio-level pricing."""
-    aggregated = severity_df.groupby(POLICY_ID_COLUMN, as_index=False)[SEVERITY_TARGET].sum()
-    aggregated = aggregated.rename(columns={SEVERITY_TARGET: "TotalClaimAmount"})
-    return aggregated
+    policy_severity_totals = severity_df.groupby(POLICY_ID_COLUMN, as_index=False)[SEVERITY_TARGET].sum()
+    policy_severity_totals = policy_severity_totals.rename(columns={SEVERITY_TARGET: "TotalClaimAmount"})
+    return policy_severity_totals
 
 
 def prepare_model_datasets(
@@ -195,8 +206,9 @@ def prepare_model_datasets(
         0.0,
     )
 
-    claim_features = frequency_df[[POLICY_ID_COLUMN] + INPUT_COLUMNS[1:] + ["LogDensity"]].copy()
-    claim_df = severity_df.merge(claim_features, on=POLICY_ID_COLUMN, how="inner")
+    # Severity model is trained at claim level, so each claim row must carry policy attributes.
+    claim_level_features = frequency_df[[POLICY_ID_COLUMN] + INPUT_COLUMNS[1:] + ["LogDensity"]].copy()
+    claim_df = severity_df.merge(claim_level_features, on=POLICY_ID_COLUMN, how="inner")
     claim_df = claim_df[claim_df[SEVERITY_TARGET] > 0].copy()
 
     data_quality = {
@@ -215,7 +227,12 @@ def prepare_model_datasets(
 
 
 def build_inference_frame(df: pd.DataFrame, metadata: dict[str, Any] | None = None) -> pd.DataFrame:
-    """Prepare arbitrary user input for saved-model inference."""
+    """
+    Prepare user-provided policy rows for inference with saved models.
+
+    This function validates minimum required columns, supports alias-based
+    column names, and applies the same feature engineering used during training.
+    """
     if df is None or df.empty:
         raise DataValidationError("Input CSV is empty. Please upload a file with at least one policy row.")
 

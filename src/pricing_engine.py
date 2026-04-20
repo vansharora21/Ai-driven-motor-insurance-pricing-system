@@ -23,6 +23,8 @@ def compute_risk_thresholds(
     The thresholds are absolute business settings rather than portfolio quantiles,
     so the same policy profile is segmented consistently across datasets.
     """
+    # The pure_premium parameter is intentionally kept for backward API compatibility.
+    _ = pure_premium
     pricing = dict(DEFAULT_PRICING_CONFIG)
     if pricing_config:
         pricing.update(pricing_config)
@@ -38,6 +40,7 @@ def compute_portfolio_baselines(
     expected_severity: pd.Series,
     pricing_config: Mapping[str, float] | None = None,
 ) -> dict[str, float]:
+    """Compute stable portfolio-level baselines used for relativity and risk scoring."""
     pricing = dict(DEFAULT_PRICING_CONFIG)
     if pricing_config:
         pricing.update(pricing_config)
@@ -79,15 +82,20 @@ def calculate_premium(
     risk_thresholds: Mapping[str, float] | None = None,
     portfolio_baselines: Mapping[str, float] | None = None,
 ) -> pd.DataFrame:
-    """Convert model outputs into actuarially consistent premium components."""
+    """
+    Convert model outputs into premium components used for underwriting.
+
+    Returned columns include predicted frequency/severity, expected losses,
+    premium components, risk score, and final risk category.
+    """
     pricing = dict(DEFAULT_PRICING_CONFIG)
     if pricing_config:
         pricing.update(pricing_config)
 
-    scored = df.copy()
-    exposure = pd.to_numeric(scored[EXPOSURE_COLUMN], errors="coerce").fillna(1.0).clip(lower=EXPOSURE_LOWER_BOUND)
-    annual_frequency_series = pd.Series(annual_frequency, index=scored.index, copy=False).astype(float).clip(lower=0.0)
-    expected_severity_series = pd.Series(expected_severity, index=scored.index, copy=False).astype(float).clip(lower=0.0)
+    scored_df = df.copy()
+    exposure_values = pd.to_numeric(scored_df[EXPOSURE_COLUMN], errors="coerce").fillna(1.0).clip(lower=EXPOSURE_LOWER_BOUND)
+    annual_frequency_series = pd.Series(annual_frequency, index=scored_df.index, copy=False).astype(float).clip(lower=0.0)
+    expected_severity_series = pd.Series(expected_severity, index=scored_df.index, copy=False).astype(float).clip(lower=0.0)
 
     resolved_baselines = (
         {key: float(value) for key, value in portfolio_baselines.items()}
@@ -97,25 +105,25 @@ def calculate_premium(
     baseline_floor = float(pricing["risk_score_baseline_floor"])
     annualized_loss_baseline = max(float(resolved_baselines["annualized_expected_loss"]), baseline_floor)
 
-    scored["predicted_annual_frequency"] = annual_frequency_series
-    scored["predicted_claim_count"] = scored["predicted_annual_frequency"] * exposure
-    scored["predicted_claim_severity"] = expected_severity_series
+    scored_df["predicted_annual_frequency"] = annual_frequency_series
+    scored_df["predicted_claim_count"] = scored_df["predicted_annual_frequency"] * exposure_values
+    scored_df["predicted_claim_severity"] = expected_severity_series
 
     # Annualized loss is exposure-neutral, so it is the right basis for stable risk bands.
-    scored["annualized_expected_loss"] = scored["predicted_annual_frequency"] * scored["predicted_claim_severity"]
+    scored_df["annualized_expected_loss"] = scored_df["predicted_annual_frequency"] * scored_df["predicted_claim_severity"]
 
     # Expected loss for the policy term is frequency x severity x exposure.
-    scored["expected_loss"] = scored["predicted_claim_count"] * scored["predicted_claim_severity"]
-    scored["pure_premium"] = scored["expected_loss"]
-    scored["technical_premium"] = scored["pure_premium"] * (1.0 + float(pricing["expense_loading"])) + float(pricing["fixed_expense"])
-    scored["loaded_premium"] = scored["technical_premium"]
-    scored["final_premium"] = scored["technical_premium"].clip(lower=float(pricing["minimum_premium"]))
+    scored_df["expected_loss"] = scored_df["predicted_claim_count"] * scored_df["predicted_claim_severity"]
+    scored_df["pure_premium"] = scored_df["expected_loss"]
+    scored_df["technical_premium"] = scored_df["pure_premium"] * (1.0 + float(pricing["expense_loading"])) + float(pricing["fixed_expense"])
+    scored_df["loaded_premium"] = scored_df["technical_premium"]
+    scored_df["final_premium"] = scored_df["technical_premium"].clip(lower=float(pricing["minimum_premium"]))
 
-    scored["frequency_relativity"] = scored["predicted_annual_frequency"] / max(float(resolved_baselines["annual_frequency"]), baseline_floor)
-    scored["severity_relativity"] = scored["predicted_claim_severity"] / max(float(resolved_baselines["claim_severity"]), baseline_floor)
-    scored["risk_score"] = float(pricing["risk_score_scale"]) * scored["annualized_expected_loss"] / annualized_loss_baseline
-    scored["risk_category"] = assign_risk_category(
-        scored["annualized_expected_loss"],
+    scored_df["frequency_relativity"] = scored_df["predicted_annual_frequency"] / max(float(resolved_baselines["annual_frequency"]), baseline_floor)
+    scored_df["severity_relativity"] = scored_df["predicted_claim_severity"] / max(float(resolved_baselines["claim_severity"]), baseline_floor)
+    scored_df["risk_score"] = float(pricing["risk_score_scale"]) * scored_df["annualized_expected_loss"] / annualized_loss_baseline
+    scored_df["risk_category"] = assign_risk_category(
+        scored_df["annualized_expected_loss"],
         thresholds=risk_thresholds or compute_risk_thresholds(pricing_config=pricing),
     )
-    return scored
+    return scored_df

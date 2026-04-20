@@ -17,9 +17,14 @@ def train_severity_model(
     alpha: float | None = None,
     max_iter: int | None = None,
 ) -> Pipeline:
-    """Train a Gamma regression model on observed claim severities."""
-    train_df = df[df[SEVERITY_TARGET] > 0].copy()
-    if train_df.empty:
+    """
+    Train a Gamma regression model on positive claim amounts.
+
+    Gamma regression requires strictly positive targets, so non-positive claim
+    amounts are excluded before training.
+    """
+    positive_claim_df = df[df[SEVERITY_TARGET] > 0].copy()
+    if positive_claim_df.empty:
         raise ValueError("Severity training data is empty after filtering positive claims.")
 
     severity_config = MODEL_CONFIG["severity"]
@@ -35,32 +40,32 @@ def train_severity_model(
             ),
         ]
     )
-    model.fit(train_df[MODEL_FEATURES], train_df[SEVERITY_TARGET])
+    model.fit(positive_claim_df[MODEL_FEATURES], positive_claim_df[SEVERITY_TARGET])
     return model
 
 
 def predict_severity(model: Pipeline, df: pd.DataFrame) -> pd.Series:
-    """Predict expected claim severity for each policy or claim row."""
-    predictions = model.predict(df[MODEL_FEATURES])
-    predictions = np.clip(predictions, 1e-9, None)
-    return pd.Series(predictions, index=df.index, name="predicted_claim_severity")
+    """Predict expected claim severity for each row in the input dataframe."""
+    predicted_severity = model.predict(df[MODEL_FEATURES])
+    predicted_severity = np.clip(predicted_severity, 1e-9, None)
+    return pd.Series(predicted_severity, index=df.index, name="predicted_claim_severity")
 
 
 def evaluate_severity_model(model: Pipeline, df: pd.DataFrame) -> dict[str, float]:
-    """Evaluate severity predictions on a positive-claim holdout dataset."""
-    eval_df = df[df[SEVERITY_TARGET] > 0].copy()
-    if eval_df.empty:
+    """Evaluate holdout severity performance using MAE and RMSE."""
+    positive_eval_df = df[df[SEVERITY_TARGET] > 0].copy()
+    if positive_eval_df.empty:
         raise ValueError("Severity evaluation data is empty after filtering positive claims.")
 
-    actual = eval_df[SEVERITY_TARGET].astype(float)
-    predicted = predict_severity(model, eval_df)
+    observed_severity = positive_eval_df[SEVERITY_TARGET].astype(float)
+    predicted_severity = predict_severity(model, positive_eval_df)
 
-    mae = float(mean_absolute_error(actual, predicted))
-    rmse = float(np.sqrt(mean_squared_error(actual, predicted)))
+    mae = float(mean_absolute_error(observed_severity, predicted_severity))
+    rmse = float(np.sqrt(mean_squared_error(observed_severity, predicted_severity)))
 
     return {
         "mae": mae,
         "rmse": rmse,
-        "observed_average_severity": float(actual.mean()),
-        "predicted_average_severity": float(predicted.mean()),
+        "observed_average_severity": float(observed_severity.mean()),
+        "predicted_average_severity": float(predicted_severity.mean()),
     }

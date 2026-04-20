@@ -69,6 +69,7 @@ SIMULATED_FEATURE_ALIASES = {
 
 
 def _copy_first_matching_column(df: pd.DataFrame, target_column: str, aliases: list[str]) -> None:
+    """Copy the first available alias into the canonical target column."""
     if target_column in df.columns:
         return
 
@@ -79,6 +80,7 @@ def _copy_first_matching_column(df: pd.DataFrame, target_column: str, aliases: l
 
 
 def _normalize_input_schema(df: pd.DataFrame) -> pd.DataFrame:
+    """Normalize heterogeneous input schemas into canonical training/inference columns."""
     normalized = df.copy()
     for target_column, aliases in CANONICAL_COLUMN_ALIASES.items():
         _copy_first_matching_column(normalized, target_column, aliases)
@@ -90,6 +92,7 @@ def _normalize_input_schema(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def _resolve_numeric_default(df: pd.DataFrame, column: str, numeric_defaults: dict[str, float] | None) -> float:
+    """Resolve numeric default from metadata, data median, or global fallback."""
     if numeric_defaults and column in numeric_defaults:
         return float(numeric_defaults[column])
 
@@ -103,6 +106,7 @@ def _resolve_numeric_default(df: pd.DataFrame, column: str, numeric_defaults: di
 
 
 def _resolve_categorical_default(df: pd.DataFrame, column: str, categorical_defaults: dict[str, str] | None) -> str:
+    """Resolve categorical default from metadata, mode, or global fallback."""
     if categorical_defaults and column in categorical_defaults:
         return str(categorical_defaults[column])
 
@@ -116,6 +120,7 @@ def _resolve_categorical_default(df: pd.DataFrame, column: str, categorical_defa
 
 
 def _apply_clip_bounds(df: pd.DataFrame, column: str) -> None:
+    """Apply configured min/max clipping bounds to a numeric column."""
     bounds = NUMERIC_CLIP_BOUNDS.get(column, {})
     lower = bounds.get("min")
     upper = bounds.get("max")
@@ -123,6 +128,7 @@ def _apply_clip_bounds(df: pd.DataFrame, column: str) -> None:
 
 
 def _standardize_optional_simulated_features(df: pd.DataFrame) -> None:
+    """Standardize optional simulation-era columns without using them as core model inputs."""
     numeric_simulated_columns = {
         "simulated_daily_mileage",
         "simulated_accidents_last_2yr",
@@ -154,37 +160,40 @@ def engineer_features(
     telematics-style inputs are preserved only as explicitly simulated fields and
     are not used by the pricing models.
     """
-    df = _normalize_input_schema(df.copy())
+    feature_df = _normalize_input_schema(df.copy())
 
-    if POLICY_ID_COLUMN not in df.columns:
-        df[POLICY_ID_COLUMN] = np.arange(1, len(df) + 1)
+    if POLICY_ID_COLUMN not in feature_df.columns:
+        feature_df[POLICY_ID_COLUMN] = np.arange(1, len(feature_df) + 1)
 
-    df[POLICY_ID_COLUMN] = pd.to_numeric(df[POLICY_ID_COLUMN], errors="coerce")
-    df[POLICY_ID_COLUMN] = df[POLICY_ID_COLUMN].fillna(pd.Series(np.arange(1, len(df) + 1), index=df.index))
-    df[POLICY_ID_COLUMN] = df[POLICY_ID_COLUMN].round().astype(int)
+    feature_df[POLICY_ID_COLUMN] = pd.to_numeric(feature_df[POLICY_ID_COLUMN], errors="coerce")
+    feature_df[POLICY_ID_COLUMN] = feature_df[POLICY_ID_COLUMN].fillna(
+        pd.Series(np.arange(1, len(feature_df) + 1), index=feature_df.index)
+    )
+    feature_df[POLICY_ID_COLUMN] = feature_df[POLICY_ID_COLUMN].round().astype(int)
 
     numeric_columns = [EXPOSURE_COLUMN] + RAW_NUMERIC_FEATURES
     for column in numeric_columns:
-        if column not in df.columns:
-            df[column] = _resolve_numeric_default(df, column, numeric_defaults)
+        if column not in feature_df.columns:
+            feature_df[column] = _resolve_numeric_default(feature_df, column, numeric_defaults)
 
-        df[column] = pd.to_numeric(df[column], errors="coerce")
-        default_value = _resolve_numeric_default(df, column, numeric_defaults)
-        df[column] = df[column].fillna(default_value)
-        _apply_clip_bounds(df, column)
+        feature_df[column] = pd.to_numeric(feature_df[column], errors="coerce")
+        default_value = _resolve_numeric_default(feature_df, column, numeric_defaults)
+        feature_df[column] = feature_df[column].fillna(default_value)
+        _apply_clip_bounds(feature_df, column)
 
-    df[EXPOSURE_COLUMN] = df[EXPOSURE_COLUMN].clip(lower=EXPOSURE_LOWER_BOUND)
-    df["LogDensity"] = np.log1p(df["Density"])
+    # Exposure must stay positive for Poisson frequency target normalization.
+    feature_df[EXPOSURE_COLUMN] = feature_df[EXPOSURE_COLUMN].clip(lower=EXPOSURE_LOWER_BOUND)
+    feature_df["LogDensity"] = np.log1p(feature_df["Density"])
 
     for column in CATEGORICAL_FEATURES:
-        default_value = _resolve_categorical_default(df, column, categorical_defaults)
-        if column not in df.columns:
-            df[column] = default_value
-        df[column] = df[column].fillna(default_value).astype(str).str.strip()
-        df.loc[df[column] == "", column] = default_value
+        default_value = _resolve_categorical_default(feature_df, column, categorical_defaults)
+        if column not in feature_df.columns:
+            feature_df[column] = default_value
+        feature_df[column] = feature_df[column].fillna(default_value).astype(str).str.strip()
+        feature_df.loc[feature_df[column] == "", column] = default_value
 
-    _standardize_optional_simulated_features(df)
-    return df
+    _standardize_optional_simulated_features(feature_df)
+    return feature_df
 
 
 def build_preprocessor() -> ColumnTransformer:
@@ -212,7 +221,7 @@ def build_preprocessor() -> ColumnTransformer:
 
 
 def build_default_metadata(df: pd.DataFrame) -> dict[str, dict[str, float | str] | dict[str, list[str]] | list[str]]:
-    """Capture training-time defaults for later inference."""
+    """Capture training-time defaults and schema aliases for reproducible inference."""
     numeric_defaults = {column: float(df[column].median()) for column in [EXPOSURE_COLUMN] + RAW_NUMERIC_FEATURES}
     categorical_defaults = {
         column: str(df[column].dropna().astype(str).mode().iloc[0]) if not df[column].dropna().empty else DEFAULT_CATEGORICAL_VALUES[column]

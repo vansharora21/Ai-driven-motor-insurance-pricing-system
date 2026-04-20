@@ -19,7 +19,12 @@ def train_frequency_model(
     alpha: float | None = None,
     max_iter: int | None = None,
 ) -> Pipeline:
-    """Train a Poisson frequency model on claims per unit exposure."""
+    """
+    Train a Poisson model for claim frequency per exposure unit.
+
+    The target is ClaimNb / Exposure and exposure is passed as sample weight,
+    matching standard actuarial frequency modeling practice.
+    """
     frequency_config = MODEL_CONFIG["frequency"]
     model = Pipeline(
         steps=[
@@ -34,17 +39,17 @@ def train_frequency_model(
         ]
     )
 
-    exposure = df[EXPOSURE_COLUMN].clip(lower=EXPOSURE_LOWER_BOUND)
-    target_frequency = df[FREQUENCY_TARGET] / exposure
-    model.fit(df[MODEL_FEATURES], target_frequency, regressor__sample_weight=exposure)
+    exposure_values = df[EXPOSURE_COLUMN].clip(lower=EXPOSURE_LOWER_BOUND)
+    target_frequency = df[FREQUENCY_TARGET] / exposure_values
+    model.fit(df[MODEL_FEATURES], target_frequency, regressor__sample_weight=exposure_values)
     return model
 
 
 def predict_frequency(model: Pipeline, df: pd.DataFrame) -> pd.Series:
-    """Predict annual claim frequency for each policy."""
-    predictions = model.predict(df[MODEL_FEATURES])
-    predictions = np.clip(predictions, 1e-9, None)
-    return pd.Series(predictions, index=df.index, name="predicted_annual_frequency")
+    """Predict annualized claim frequency for each policy row."""
+    predicted_frequency = model.predict(df[MODEL_FEATURES])
+    predicted_frequency = np.clip(predicted_frequency, 1e-9, None)
+    return pd.Series(predicted_frequency, index=df.index, name="predicted_annual_frequency")
 
 
 def predict_claim_count(model: Pipeline, df: pd.DataFrame) -> pd.Series:
@@ -54,16 +59,16 @@ def predict_claim_count(model: Pipeline, df: pd.DataFrame) -> pd.Series:
 
 
 def evaluate_frequency_model(model: Pipeline, df: pd.DataFrame) -> dict[str, float]:
-    """Evaluate predicted claim counts on a holdout dataset."""
-    actual_claim_count = df[FREQUENCY_TARGET].astype(float)
+    """Evaluate holdout claim-count performance using RMSE and Poisson deviance."""
+    observed_claim_count = df[FREQUENCY_TARGET].astype(float)
     predicted_claim_count = predict_claim_count(model, df).clip(lower=1e-9)
 
-    rmse = float(np.sqrt(mean_squared_error(actual_claim_count, predicted_claim_count)))
-    poisson_deviance = float(mean_poisson_deviance(actual_claim_count, predicted_claim_count))
+    rmse = float(np.sqrt(mean_squared_error(observed_claim_count, predicted_claim_count)))
+    poisson_deviance = float(mean_poisson_deviance(observed_claim_count, predicted_claim_count))
 
     return {
         "rmse": rmse,
         "mean_poisson_deviance": poisson_deviance,
-        "observed_average_claim_count": float(actual_claim_count.mean()),
+        "observed_average_claim_count": float(observed_claim_count.mean()),
         "predicted_average_claim_count": float(predicted_claim_count.mean()),
     }
