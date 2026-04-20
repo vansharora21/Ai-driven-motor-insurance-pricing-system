@@ -1,9 +1,7 @@
 joblib
 matplotlib
-nbformat
 numpy
 pandas
-pytest
 scikit-learn
 seaborn
 streamlit>=1.25.0

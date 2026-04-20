@@ -26,12 +26,8 @@ Research-grade motor insurance pricing system built on the real freMTPL2 frequen
 |  |- model_artifacts.py
 |  |- experiment_tracking.py
 |  |- visualization.py
-|  |- fraud_detection.py
-|  |- simulation.py
 |- configs/
 |  |- modeling_config.json       # Canonical modeling config
-|- config/
-|  |- modeling_config.json       # Legacy fallback config
 |- data/
 |  |- freMTPL2freq.csv
 |  |- freMTPL2sev.csv
@@ -106,13 +102,13 @@ These records are written to results/experiments/<timestamp>/run_summary.json.
 Run batch inference:
 
 ```bash
-python -m scripts.predict --input data/sample_batch.csv --output results/premium_reports/predictions.csv
+python -m scripts.predict --input data/freMTPL2freq.csv --output results/premium_reports/predictions.csv
 ```
 
 Backward-compatible command:
 
 ```bash
-python predict.py --input data/sample_batch.csv --output results/premium_reports/predictions.csv
+python predict.py --input data/freMTPL2freq.csv --output results/premium_reports/predictions.csv
 ```
 
 ## Streamlit App
