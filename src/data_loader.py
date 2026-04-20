@@ -1,47 +1,167 @@
-import pandas as pd
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Any
+
 import numpy as np
+import pandas as pd
 
-def load_data(filepath='data/drivers.csv'):
-    """Loads the driver dataset from a CSV file."""
-    try:
-        df = pd.read_csv(filepath)
-        print(f"Data loaded successfully. Shape: {df.shape}")
-        return df
-    except FileNotFoundError:
-        print(f"Error: File '{filepath}' not found.")
-        return None
+from src.feature_engineering import (
+    CATEGORICAL_FEATURES,
+    EXPOSURE_COLUMN,
+    FREQUENCY_TARGET,
+    INPUT_COLUMNS,
+    POLICY_ID_COLUMN,
+    SEVERITY_TARGET,
+    engineer_features,
+)
 
-def preprocess_data(df):
-    """Cleans and preprocesses the dataset."""
-    if df is None:
-        return None
-        
-    # Handle missing values (simple fill for demo purposes)
-    df.fillna({
-        'age': df['age'].median(),
-        'vehicle_age': df['vehicle_age'].median(),
-        'daily_mileage': df['daily_mileage'].median()
-    }, inplace=True)
-    
-    # Categorical encoding mappings
-    level_mapping = {'Low': 1, 'Medium': 2, 'High': 3}
-    
-    df['night_driving_encoded'] = df['night_driving_level'].map(level_mapping).fillna(1)
-    df['harsh_braking_encoded'] = df['harsh_braking_level'].map(level_mapping).fillna(1)
-    
-    # One-hot encode vehicle_type
-    df = pd.get_dummies(df, columns=['vehicle_type'], drop_first=False)
-    
-    # Standardize column naming for boolean
-    for col in df.columns:
-        if col.startswith('vehicle_type_'):
-            df[col] = df[col].astype(int)
-            
-    print("Data preprocessing completed.")
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_FREQUENCY_PATH = PROJECT_ROOT / "data" / "freMTPL2freq.csv"
+DEFAULT_SEVERITY_PATH = PROJECT_ROOT / "data" / "freMTPL2sev.csv"
+
+FREQUENCY_REQUIRED_COLUMNS = [
+    POLICY_ID_COLUMN,
+    FREQUENCY_TARGET,
+    EXPOSURE_COLUMN,
+    "VehPower",
+    "VehAge",
+    "DrivAge",
+    "BonusMalus",
+    "VehBrand",
+    "VehGas",
+    "Area",
+    "Density",
+    "Region",
+]
+SEVERITY_REQUIRED_COLUMNS = [POLICY_ID_COLUMN, SEVERITY_TARGET]
+
+
+def _validate_columns(df: pd.DataFrame, required_columns: list[str], dataset_name: str) -> None:
+    missing_columns = [column for column in required_columns if column not in df.columns]
+    if missing_columns:
+        raise ValueError(f"{dataset_name} is missing required columns: {missing_columns}")
+
+
+def load_frequency_data(filepath: str | Path = DEFAULT_FREQUENCY_PATH) -> pd.DataFrame:
+    """Load the raw freMTPL2 frequency dataset."""
+    df = pd.read_csv(filepath)
+    _validate_columns(df, FREQUENCY_REQUIRED_COLUMNS, "Frequency dataset")
     return df
 
-if __name__ == "__main__":
-    df = load_data()
-    if df is not None:
-        processed_df = preprocess_data(df)
-        print(processed_df.head())
+
+def load_severity_data(filepath: str | Path = DEFAULT_SEVERITY_PATH) -> pd.DataFrame:
+    """Load the raw freMTPL2 severity dataset."""
+    df = pd.read_csv(filepath)
+    _validate_columns(df, SEVERITY_REQUIRED_COLUMNS, "Severity dataset")
+    return df
+
+
+def clean_frequency_data(df: pd.DataFrame) -> pd.DataFrame:
+    """Clean the policy-level frequency data and make it modeling-ready."""
+    df = df.copy()
+    _validate_columns(df, FREQUENCY_REQUIRED_COLUMNS, "Frequency dataset")
+
+    numeric_columns = [POLICY_ID_COLUMN, FREQUENCY_TARGET, EXPOSURE_COLUMN, "VehPower", "VehAge", "DrivAge", "BonusMalus", "Density"]
+    for column in numeric_columns:
+        df[column] = pd.to_numeric(df[column], errors="coerce")
+
+    df[POLICY_ID_COLUMN] = df[POLICY_ID_COLUMN].round().astype("Int64")
+    df = df.dropna(subset=[POLICY_ID_COLUMN]).copy()
+    df[POLICY_ID_COLUMN] = df[POLICY_ID_COLUMN].astype(int)
+
+    df[FREQUENCY_TARGET] = df[FREQUENCY_TARGET].fillna(0).clip(lower=0).round().astype(int)
+    df[EXPOSURE_COLUMN] = df[EXPOSURE_COLUMN].fillna(1.0).clip(lower=1e-6)
+
+    for column in CATEGORICAL_FEATURES:
+        df[column] = df[column].fillna("Unknown").astype(str).str.strip()
+        df.loc[df[column] == "", column] = "Unknown"
+
+    cleaned = engineer_features(df)
+    cleaned["has_claim"] = (cleaned[FREQUENCY_TARGET] > 0).astype(int)
+    cleaned["observed_claim_frequency"] = cleaned[FREQUENCY_TARGET] / cleaned[EXPOSURE_COLUMN]
+    return cleaned
+
+
+def clean_severity_data(df: pd.DataFrame) -> pd.DataFrame:
+    """Clean the claim-level severity data."""
+    df = df.copy()
+    _validate_columns(df, SEVERITY_REQUIRED_COLUMNS, "Severity dataset")
+
+    df[POLICY_ID_COLUMN] = pd.to_numeric(df[POLICY_ID_COLUMN], errors="coerce").round().astype("Int64")
+    df[SEVERITY_TARGET] = pd.to_numeric(df[SEVERITY_TARGET], errors="coerce")
+    df = df.dropna(subset=[POLICY_ID_COLUMN, SEVERITY_TARGET]).copy()
+    df[POLICY_ID_COLUMN] = df[POLICY_ID_COLUMN].astype(int)
+    df[SEVERITY_TARGET] = df[SEVERITY_TARGET].clip(lower=0)
+    df = df[df[SEVERITY_TARGET] > 0].copy()
+    return df
+
+
+def aggregate_severity_by_policy(severity_df: pd.DataFrame) -> pd.DataFrame:
+    """Aggregate total claim amount by policy for portfolio-level pricing."""
+    aggregated = severity_df.groupby(POLICY_ID_COLUMN, as_index=False)[SEVERITY_TARGET].sum()
+    aggregated = aggregated.rename(columns={SEVERITY_TARGET: "TotalClaimAmount"})
+    return aggregated
+
+
+def prepare_model_datasets(
+    frequency_path: str | Path = DEFAULT_FREQUENCY_PATH,
+    severity_path: str | Path = DEFAULT_SEVERITY_PATH,
+) -> tuple[pd.DataFrame, pd.DataFrame, dict[str, Any]]:
+    """
+    Load, clean, and align the freMTPL2 datasets for training.
+
+    Returns:
+        policy_df: one row per policy for frequency modeling and final pricing
+        claim_df: one row per claim for severity modeling
+        data_quality: summary of merge quality and dropped rows
+    """
+    frequency_df = clean_frequency_data(load_frequency_data(frequency_path))
+    severity_df = clean_severity_data(load_severity_data(severity_path))
+
+    severity_by_policy = aggregate_severity_by_policy(severity_df)
+    policy_df = frequency_df.merge(severity_by_policy, on=POLICY_ID_COLUMN, how="left")
+    policy_df["TotalClaimAmount"] = policy_df["TotalClaimAmount"].fillna(0.0)
+    policy_df["AverageClaimAmount"] = np.where(
+        policy_df[FREQUENCY_TARGET] > 0,
+        policy_df["TotalClaimAmount"] / policy_df[FREQUENCY_TARGET].clip(lower=1),
+        0.0,
+    )
+
+    claim_features = frequency_df[[POLICY_ID_COLUMN] + INPUT_COLUMNS[1:] + ["LogDensity"]].copy()
+    claim_df = severity_df.merge(claim_features, on=POLICY_ID_COLUMN, how="inner")
+    claim_df = claim_df[claim_df[SEVERITY_TARGET] > 0].copy()
+
+    data_quality = {
+        "frequency_rows": int(len(frequency_df)),
+        "severity_rows": int(len(severity_df)),
+        "policies_with_claims": int((frequency_df[FREQUENCY_TARGET] > 0).sum()),
+        "policies_with_paid_amounts": int((policy_df["TotalClaimAmount"] > 0).sum()),
+        "positive_claim_count_without_paid_amount": int(
+            ((policy_df[FREQUENCY_TARGET] > 0) & (policy_df["TotalClaimAmount"] <= 0)).sum()
+        ),
+        "severity_rows_without_matching_policy": int((~severity_df[POLICY_ID_COLUMN].isin(frequency_df[POLICY_ID_COLUMN])).sum()),
+        "claim_rows_used_for_severity_model": int(len(claim_df)),
+    }
+
+    return policy_df, claim_df, data_quality
+
+
+def build_inference_frame(df: pd.DataFrame, metadata: dict[str, Any] | None = None) -> pd.DataFrame:
+    """Prepare arbitrary user input for saved-model inference."""
+    if df is None or df.empty:
+        raise ValueError("Input data is empty.")
+
+    defaults = metadata or {}
+    numeric_defaults = defaults.get("numeric_defaults", {})
+    categorical_defaults = defaults.get("categorical_defaults", {})
+    prepared = engineer_features(
+        df.copy(),
+        numeric_defaults=numeric_defaults,
+        categorical_defaults=categorical_defaults,
+    )
+
+    if POLICY_ID_COLUMN not in prepared.columns:
+        prepared[POLICY_ID_COLUMN] = np.arange(1, len(prepared) + 1)
+
+    return prepared

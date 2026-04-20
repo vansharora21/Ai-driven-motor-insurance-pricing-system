@@ -1,68 +1,61 @@
-import pandas as pd
+from __future__ import annotations
+
+from typing import Mapping
+
 import numpy as np
+import pandas as pd
 
-def calculate_premium(df, expected_frequency, expected_severity, base_rate=3000):
-    """
-    Calculates dynamic personalized insurance premiums.
-    """
-    df_premium = df.copy()
-    
-    # Core Components
-    df_premium['base_premium'] = base_rate
-    
-    # Handle potentially missing predictions if models failed
-    if expected_frequency is None:
-        df_premium['expected_frequency'] = 0.15 # fallback
-    else:
-        df_premium['expected_frequency'] = expected_frequency
-        
-    if expected_severity is None:
-        df_premium['expected_severity'] = 25000 # fallback
-    else:
-        df_premium['expected_severity'] = expected_severity
-        
-    # Calculate Expected Loss
-    df_premium['expected_loss'] = df_premium['expected_frequency'] * df_premium['expected_severity']
-    
-    # Risk Adjustment
-    # Assumes driver_risk_index (0.0 to 1.0) was calculated in feature_engineering
-    risk_multiplier = 5000  # max additional penalty
-    df_premium['risk_adjustment'] = df_premium['driver_risk_index'] * risk_multiplier
-    
-    # Safe Driver Discount
-    # E.g., no accidents and low braking score gets a discount
-    df_premium['safe_driver_discount'] = np.where(
-        (df_premium['accidents_last_2yr'] == 0) & (df_premium['braking_score'] < 0.4),
-        0.15 * df_premium['base_premium'], # 15% off base
-        0
-    )
-    
-    # Final Calculation
-    df_premium['final_premium'] = (
-        df_premium['base_premium'] + 
-        df_premium['expected_loss'] + 
-        df_premium['risk_adjustment'] - 
-        df_premium['safe_driver_discount']
-    )
-    
-    # Cap minimum premium
-    df_premium['final_premium'] = df_premium['final_premium'].clip(lower=1500)
-    
-    return df_premium
+from src.feature_engineering import EXPOSURE_COLUMN
 
-if __name__ == "__main__":
-    from data_loader import load_data, preprocess_data
-    from feature_engineering import create_features
-    
-    df = preprocess_data(load_data('../data/drivers.csv'))
-    
-    if df is not None:
-        df = create_features(df)
-        
-        # Mock predictions for testing the logic independently
-        mock_freq = pd.Series(np.random.uniform(0.01, 0.4, len(df)), index=df.index)
-        mock_sev = pd.Series(np.random.uniform(10000, 50000, len(df)), index=df.index)
-        
-        premium_df = calculate_premium(df, mock_freq, mock_sev)
-        
-        print(premium_df[['driver_id', 'risk_category', 'final_premium']].head())
+DEFAULT_PRICING_CONFIG = {
+    "expense_loading": 0.30,
+    "fixed_expense": 50.0,
+    "minimum_premium": 50.0,
+}
+
+
+def compute_risk_thresholds(pure_premium: pd.Series) -> dict[str, float]:
+    """Derive simple portfolio-relative risk thresholds from the pure premium distribution."""
+    return {
+        "low_to_medium": float(pure_premium.quantile(0.33)),
+        "medium_to_high": float(pure_premium.quantile(0.67)),
+    }
+
+
+def assign_risk_category(pure_premium: pd.Series, thresholds: Mapping[str, float] | None = None) -> pd.Series:
+    """Map premium levels into Low / Medium / High risk segments."""
+    if not thresholds:
+        return pd.Series(["Unassigned"] * len(pure_premium), index=pure_premium.index, name="risk_category")
+
+    low_to_medium = thresholds["low_to_medium"]
+    medium_to_high = thresholds["medium_to_high"]
+
+    categories = np.where(
+        pure_premium <= low_to_medium,
+        "Low",
+        np.where(pure_premium <= medium_to_high, "Medium", "High"),
+    )
+    return pd.Series(categories, index=pure_premium.index, name="risk_category")
+
+
+def calculate_premium(
+    df: pd.DataFrame,
+    annual_frequency: pd.Series,
+    expected_severity: pd.Series,
+    pricing_config: Mapping[str, float] | None = None,
+    risk_thresholds: Mapping[str, float] | None = None,
+) -> pd.DataFrame:
+    """Convert model outputs into pure premium and loaded premium components."""
+    pricing = dict(DEFAULT_PRICING_CONFIG)
+    if pricing_config:
+        pricing.update(pricing_config)
+
+    scored = df.copy()
+    scored["predicted_annual_frequency"] = annual_frequency
+    scored["predicted_claim_count"] = scored["predicted_annual_frequency"] * scored[EXPOSURE_COLUMN]
+    scored["predicted_claim_severity"] = expected_severity
+    scored["pure_premium"] = scored["predicted_claim_count"] * scored["predicted_claim_severity"]
+    scored["loaded_premium"] = scored["pure_premium"] * (1.0 + pricing["expense_loading"]) + pricing["fixed_expense"]
+    scored["final_premium"] = scored["loaded_premium"].clip(lower=pricing["minimum_premium"])
+    scored["risk_category"] = assign_risk_category(scored["pure_premium"], risk_thresholds)
+    return scored

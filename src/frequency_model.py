@@ -1,48 +1,57 @@
-import statsmodels.api as sm
-import statsmodels.formula.api as smf
+from __future__ import annotations
+
+import numpy as np
 import pandas as pd
+from sklearn.linear_model import PoissonRegressor
+from sklearn.metrics import mean_poisson_deviance, mean_squared_error
+from sklearn.pipeline import Pipeline
 
-def train_frequency_model(df):
-    """
-    Trains a Poisson regression model to estimate the expected number
-    of accidents per driver per year.
-    """
-    print("Training Accident Frequency Model (Poisson regression)...")
-    
-    # We use past accident history as proxy for training target
-    # In reality, this would be an actual past claim frequency
-    # For this demo, we'll try to predict 'accidents_last_2yr' / 2.0 based on risk factors
-    df_copy = df.copy()
-    df_copy['target_frequency'] = df_copy['accidents_last_2yr'] / 2.0
-    
-    # Formula predicting frequency from risk components
-    formula = "target_frequency ~ braking_score + night_driving_score + annual_mileage_normalized + age + vehicle_age"
-    
-    try:
-        model = smf.glm(formula=formula, data=df_copy, family=sm.families.Poisson()).fit()
-        print(model.summary())
-        return model
-    except Exception as e:
-        print(f"Error training frequency model: {e}")
-        return None
+from src.feature_engineering import EXPOSURE_COLUMN, FREQUENCY_TARGET, MODEL_FEATURES, build_preprocessor
 
-def predict_frequency(model, df):
-    """Predicts expected accidents per year for a dataset."""
-    if model is None:
-        return None
-    
-    predictions = model.predict(df)
-    return predictions
 
-if __name__ == "__main__":
-    from data_loader import load_data, preprocess_data
-    from feature_engineering import create_features
-    
-    df = preprocess_data(load_data('../data/drivers.csv'))
-    if df is not None:
-        df = create_features(df)
-        model = train_frequency_model(df)
-        if model:
-            freq = predict_frequency(model, df)
-            print("Expected Accidents per year (first 5):")
-            print(freq.head())
+def train_frequency_model(
+    df: pd.DataFrame,
+    alpha: float = 1e-4,
+    max_iter: int = 1000,
+) -> Pipeline:
+    """Train a Poisson frequency model on claims per unit exposure."""
+    model = Pipeline(
+        steps=[
+            ("preprocessor", build_preprocessor()),
+            ("regressor", PoissonRegressor(alpha=alpha, max_iter=max_iter)),
+        ]
+    )
+
+    exposure = df[EXPOSURE_COLUMN].clip(lower=1e-6)
+    target_frequency = df[FREQUENCY_TARGET] / exposure
+    model.fit(df[MODEL_FEATURES], target_frequency, regressor__sample_weight=exposure)
+    return model
+
+
+def predict_frequency(model: Pipeline, df: pd.DataFrame) -> pd.Series:
+    """Predict annual claim frequency for each policy."""
+    predictions = model.predict(df[MODEL_FEATURES])
+    predictions = np.clip(predictions, 1e-9, None)
+    return pd.Series(predictions, index=df.index, name="predicted_annual_frequency")
+
+
+def predict_claim_count(model: Pipeline, df: pd.DataFrame) -> pd.Series:
+    """Convert annual frequency into expected claim count for the policy exposure."""
+    annual_frequency = predict_frequency(model, df)
+    return annual_frequency * df[EXPOSURE_COLUMN]
+
+
+def evaluate_frequency_model(model: Pipeline, df: pd.DataFrame) -> dict[str, float]:
+    """Evaluate predicted claim counts on a holdout dataset."""
+    actual_claim_count = df[FREQUENCY_TARGET].astype(float)
+    predicted_claim_count = predict_claim_count(model, df).clip(lower=1e-9)
+
+    rmse = float(np.sqrt(mean_squared_error(actual_claim_count, predicted_claim_count)))
+    poisson_deviance = float(mean_poisson_deviance(actual_claim_count, predicted_claim_count))
+
+    return {
+        "rmse": rmse,
+        "mean_poisson_deviance": poisson_deviance,
+        "observed_average_claim_count": float(actual_claim_count.mean()),
+        "predicted_average_claim_count": float(predicted_claim_count.mean()),
+    }

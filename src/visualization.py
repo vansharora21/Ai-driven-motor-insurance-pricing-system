@@ -1,69 +1,131 @@
+from __future__ import annotations
+
+from pathlib import Path
+
 import matplotlib.pyplot as plt
-import seaborn as sns
-import plotly.express as px
 import pandas as pd
-import os
+import seaborn as sns
 
-PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+PLOTS_DIR = PROJECT_ROOT / "results" / "plots"
+REPORTS_DIR = PROJECT_ROOT / "results" / "premium_reports"
+EVALUATION_DIR = PROJECT_ROOT / "results" / "evaluation"
 
-def check_dirs():
-    os.makedirs(os.path.join(PROJECT_ROOT, 'results', 'plots'), exist_ok=True)
-    os.makedirs(os.path.join(PROJECT_ROOT, 'results', 'premium_reports'), exist_ok=True)
 
-def plot_risk_distribution(df, save_path=None):
-    if save_path is None: save_path = os.path.join(PROJECT_ROOT, 'results', 'plots', 'risk_distribution.png')
-    """Plots the distribution of driver risk components."""
-    plt.figure(figsize=(10, 6))
-    sns.histplot(df['driver_risk_index'], bins=30, kde=True, color='purple')
-    plt.title('Distribution of Driver Risk Index')
-    plt.xlabel('Overarching Risk Index')
-    plt.ylabel('Frequency')
+def ensure_output_dirs() -> None:
+    PLOTS_DIR.mkdir(parents=True, exist_ok=True)
+    REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+    EVALUATION_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def plot_frequency_calibration(actual: pd.Series, predicted: pd.Series, save_path: Path | None = None) -> Path:
+    """Plot binned actual vs predicted claim counts for the frequency model."""
+    ensure_output_dirs()
+    save_path = save_path or (PLOTS_DIR / "frequency_calibration.png")
+
+    calibration_df = pd.DataFrame({"actual": actual, "predicted": predicted}).copy()
+    calibration_df["bucket"] = pd.qcut(
+        calibration_df["predicted"].rank(method="first"),
+        q=min(10, len(calibration_df)),
+        labels=False,
+        duplicates="drop",
+    )
+    summary = calibration_df.groupby("bucket", observed=False).agg(
+        actual_mean=("actual", "mean"),
+        predicted_mean=("predicted", "mean"),
+    )
+
+    plt.figure(figsize=(9, 6))
+    plt.plot(summary.index + 1, summary["actual_mean"], marker="o", label="Actual")
+    plt.plot(summary.index + 1, summary["predicted_mean"], marker="o", label="Predicted")
+    plt.title("Frequency Calibration by Prediction Decile")
+    plt.xlabel("Prediction Decile")
+    plt.ylabel("Average Claim Count")
+    plt.legend()
+    plt.tight_layout()
     plt.savefig(save_path)
     plt.close()
+    return save_path
 
-def plot_premium_distribution(df, save_path=None):
-    if save_path is None: save_path = os.path.join(PROJECT_ROOT, 'results', 'plots', 'premium_distribution.png')
-    """Plots the distribution of calculated final premiums."""
-    plt.figure(figsize=(10, 6))
-    sns.histplot(df['final_premium'], bins=30, kde=True, color='green')
-    plt.title('Distribution of Calculated Insurance Premiums (INR)')
-    plt.xlabel('Premium (INR)')
-    plt.ylabel('Frequency')
+
+def plot_severity_predictions(actual: pd.Series, predicted: pd.Series, save_path: Path | None = None) -> Path:
+    """Scatter plot of actual vs predicted claim severity on a sampled holdout set."""
+    ensure_output_dirs()
+    save_path = save_path or (PLOTS_DIR / "severity_actual_vs_pred.png")
+
+    plot_df = pd.DataFrame({"actual": actual, "predicted": predicted})
+    if len(plot_df) > 5000:
+        plot_df = plot_df.sample(5000, random_state=42)
+
+    axis_limit = max(plot_df["actual"].max(), plot_df["predicted"].max())
+    plt.figure(figsize=(8, 8))
+    sns.scatterplot(data=plot_df, x="actual", y="predicted", alpha=0.35, s=25)
+    plt.plot([0, axis_limit], [0, axis_limit], linestyle="--", color="black")
+    plt.title("Severity Model: Actual vs Predicted Claim Amount")
+    plt.xlabel("Actual Claim Amount")
+    plt.ylabel("Predicted Claim Amount")
+    plt.tight_layout()
     plt.savefig(save_path)
     plt.close()
+    return save_path
 
-def plot_fraud_anomalies(df):
-    """Generates an interactive plotly scatter plot highlighting frauds."""
-    # This creates an interactive html file rather than static png
-    fig = px.scatter(df, x='accidents_last_2yr', y='simulated_severity', 
-                     color='anomaly_flag', 
-                     hover_data=['driver_id', 'vehicle_age'],
-                     color_continuous_scale=[(0, "blue"), (1, "red")],
-                     title='Fraud Detection Outliers (Isolation Forest)')
-                     
-    fig.write_html(os.path.join(PROJECT_ROOT, 'results', 'plots', 'fraud_detection.html'))
 
-def plot_scenario_comparison(base_df, sim_df, metric='final_premium', save_path=None):
-    if save_path is None: save_path = os.path.join(PROJECT_ROOT, 'results', 'plots', 'scenario_comparison.png')
-    """Side by side comparison of a metric between baseline and simulated stress test."""
-    
-    comparative_df = pd.DataFrame({
-        'Baseline': base_df[metric],
-        'Urban Simulation': sim_df[metric]
-    })
-    
+def plot_premium_distribution(df: pd.DataFrame, save_path: Path | None = None) -> Path:
+    """Plot the final premium distribution on a log x-axis for heavy-tailed data."""
+    ensure_output_dirs()
+    save_path = save_path or (PLOTS_DIR / "premium_distribution.png")
+
     plt.figure(figsize=(10, 6))
-    sns.boxplot(data=comparative_df)
-    plt.title(f'Impact of Urban High-Congestion on {metric.replace("_", " ").title()}')
-    plt.ylabel(metric.replace("_", " ").title())
+    sns.histplot(df["final_premium"], bins=40, color="#1f8a70")
+    plt.xscale("log")
+    plt.title("Distribution of Final Premiums")
+    plt.xlabel("Final Premium (log scale)")
+    plt.ylabel("Policy Count")
+    plt.tight_layout()
     plt.savefig(save_path)
     plt.close()
-    
-def generate_reports(df):
-    """Outputs a text/csv premium report table."""
-    check_dirs()
-    report_df = df[['driver_id', 'driver_risk_index', 'risk_category', 'final_premium']]
-    report_df = report_df.sort_values(by='final_premium', ascending=False)
-    out_path = os.path.join(PROJECT_ROOT, 'results', 'premium_reports', 'top_premiums.csv')
-    report_df.to_csv(out_path, index=False)
-    print(f"Saved premium report to {out_path}")
+    return save_path
+
+
+def plot_risk_distribution(df: pd.DataFrame, save_path: Path | None = None) -> Path:
+    """Plot the count of Low / Medium / High risk policies."""
+    ensure_output_dirs()
+    save_path = save_path or (PLOTS_DIR / "risk_distribution.png")
+
+    plt.figure(figsize=(8, 5))
+    order = ["Low", "Medium", "High"]
+    sns.countplot(
+        data=df,
+        x="risk_category",
+        order=order,
+        hue="risk_category",
+        hue_order=order,
+        palette=["#6db784", "#f4c95d", "#d95d39"],
+        legend=False,
+    )
+    plt.title("Risk Category Distribution")
+    plt.xlabel("Risk Category")
+    plt.ylabel("Policy Count")
+    plt.tight_layout()
+    plt.savefig(save_path)
+    plt.close()
+    return save_path
+
+
+def save_top_premiums(df: pd.DataFrame, filename: str = "top_premiums.csv", top_n: int = 1000) -> Path:
+    """Persist the highest-premium policies for review."""
+    ensure_output_dirs()
+    report_columns = [
+        "IDpol",
+        "Exposure",
+        "predicted_annual_frequency",
+        "predicted_claim_count",
+        "predicted_claim_severity",
+        "pure_premium",
+        "final_premium",
+        "risk_category",
+    ]
+    report_df = df[report_columns].sort_values(by="final_premium", ascending=False).head(top_n)
+    output_path = REPORTS_DIR / filename
+    report_df.to_csv(output_path, index=False)
+    return output_path

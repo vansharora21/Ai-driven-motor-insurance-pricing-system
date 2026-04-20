@@ -1,74 +1,56 @@
-import statsmodels.api as sm
-import statsmodels.formula.api as smf
-import pandas as pd
+from __future__ import annotations
+
 import numpy as np
+import pandas as pd
+from sklearn.linear_model import GammaRegressor
+from sklearn.metrics import mean_absolute_error, mean_squared_error
+from sklearn.pipeline import Pipeline
 
-def train_severity_model(df):
-    """
-    Models the financial cost of accidents using a Gamma distribution.
-    """
-    print("Training Claim Severity Model (Gamma regression)...")
-    
-    # Generate mock claim costs for training based on requirements
-    # minor: ~10,000, moderate: ~40,000, major: ~120,000
-    df_copy = df.copy()
-    
-    # Ensure strictly positive target for Gamma distribution
-    np.random.seed(42)
-    base_cost = np.where(df_copy['accidents_last_2yr'] > 0, 
-                         np.random.choice([10000, 40000, 120000], size=len(df), p=[0.6, 0.3, 0.1]),
-                         1)  # using 1 instead of 0 for Gamma
-                         
-    df_copy['claim_severity_target'] = base_cost
-    
-    # We only train on drivers with actual claims/accidents
-    train_df = df_copy[df_copy['claim_severity_target'] > 1].copy()
-    
-    if len(train_df) < 10:
-        print("Warning: Insufficient claim data to train severity model robustly. Using dummy model.")
-        return 'dummy_model'
-        
-    # Example formula for training based on vehicle characteristics
-    # Adjust variables as needed based on actual one-hot encoded columns
-    vehicle_cols = [c for c in train_df.columns if c.startswith('vehicle_type_')]
-    if vehicle_cols:
-        formula = f"claim_severity_target ~ vehicle_age + {' + '.join(vehicle_cols)}"
-    else:
-        formula = "claim_severity_target ~ vehicle_age"
-        
-    try:
-        model = smf.glm(formula=formula, data=train_df, family=sm.families.Gamma(link=sm.families.links.log())).fit()
-        print(model.summary())
-        return model
-    except Exception as e:
-        print(f"Error training severity model: {e}")
-        return 'dummy_model'
+from src.feature_engineering import MODEL_FEATURES, SEVERITY_TARGET, build_preprocessor
 
-def predict_severity(model, df):
-    """Predicts expected claim severity."""
-    if model == 'dummy_model':
-        # Default fallback mechanism
-        return pd.Series(np.random.normal(30000, 5000, len(df)), index=df.index)
-        
-    if model is None:
-        return None
-    
-    try:
-        predictions = model.predict(df)
-        return predictions
-    except Exception as e:
-        print(f"Prediction failed: {e}. Returning baseline estimates.")
-        return pd.Series(np.random.normal(30000, 5000, len(df)), index=df.index)
 
-if __name__ == "__main__":
-    from data_loader import load_data, preprocess_data
-    from feature_engineering import create_features
-    
-    df = preprocess_data(load_data('../data/drivers.csv'))
-    if df is not None:
-        df = create_features(df)
-        model = train_severity_model(df)
-        if model:
-            sev = predict_severity(model, df)
-            print("Expected Claim Severity in INR (first 5):")
-            print(sev.head())
+def train_severity_model(
+    df: pd.DataFrame,
+    alpha: float = 1e-4,
+    max_iter: int = 1000,
+) -> Pipeline:
+    """Train a Gamma regression model on observed claim severities."""
+    train_df = df[df[SEVERITY_TARGET] > 0].copy()
+    if train_df.empty:
+        raise ValueError("Severity training data is empty after filtering positive claims.")
+
+    model = Pipeline(
+        steps=[
+            ("preprocessor", build_preprocessor()),
+            ("regressor", GammaRegressor(alpha=alpha, max_iter=max_iter)),
+        ]
+    )
+    model.fit(train_df[MODEL_FEATURES], train_df[SEVERITY_TARGET])
+    return model
+
+
+def predict_severity(model: Pipeline, df: pd.DataFrame) -> pd.Series:
+    """Predict expected claim severity for each policy or claim row."""
+    predictions = model.predict(df[MODEL_FEATURES])
+    predictions = np.clip(predictions, 1e-9, None)
+    return pd.Series(predictions, index=df.index, name="predicted_claim_severity")
+
+
+def evaluate_severity_model(model: Pipeline, df: pd.DataFrame) -> dict[str, float]:
+    """Evaluate severity predictions on a positive-claim holdout dataset."""
+    eval_df = df[df[SEVERITY_TARGET] > 0].copy()
+    if eval_df.empty:
+        raise ValueError("Severity evaluation data is empty after filtering positive claims.")
+
+    actual = eval_df[SEVERITY_TARGET].astype(float)
+    predicted = predict_severity(model, eval_df)
+
+    mae = float(mean_absolute_error(actual, predicted))
+    rmse = float(np.sqrt(mean_squared_error(actual, predicted)))
+
+    return {
+        "mae": mae,
+        "rmse": rmse,
+        "observed_average_severity": float(actual.mean()),
+        "predicted_average_severity": float(predicted.mean()),
+    }
