@@ -11,7 +11,8 @@ from typing import Any
 import numpy as np
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_CONFIG_PATH = PROJECT_ROOT / "config" / "modeling_config.json"
+DEFAULT_CONFIG_PATH = PROJECT_ROOT / "configs" / "modeling_config.json"
+LEGACY_CONFIG_PATH = PROJECT_ROOT / "config" / "modeling_config.json"
 
 DEFAULT_MODELING_CONFIG: dict[str, Any] = {
     "random_seed": 42,
@@ -87,7 +88,11 @@ def _deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any
 
 @lru_cache(maxsize=4)
 def load_modeling_config(config_path: str | Path = DEFAULT_CONFIG_PATH) -> dict[str, Any]:
+    """Load modeling configuration from configs/ with backward-compatible fallback."""
     path = Path(config_path)
+    if not path.exists() and path == DEFAULT_CONFIG_PATH and LEGACY_CONFIG_PATH.exists():
+        path = LEGACY_CONFIG_PATH
+
     config = deepcopy(DEFAULT_MODELING_CONFIG)
     if path.exists():
         with path.open("r", encoding="utf-8") as config_file:

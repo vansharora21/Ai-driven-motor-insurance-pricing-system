@@ -1,0 +1,303 @@
+{
+  "trained_at_utc": "2026-04-20T16:44:56.674967+00:00",
+  "random_seed": 42,
+  "input_columns": [
+    "IDpol",
+    "Exposure",
+    "VehPower",
+    "VehAge",
+    "DrivAge",
+    "BonusMalus",
+    "VehBrand",
+    "VehGas",
+    "Area",
+    "Density",
+    "Region"
+  ],
+  "model_features": [
+    "VehPower",
+    "VehAge",
+    "DrivAge",
+    "BonusMalus",
+    "LogDensity",
+    "VehBrand",
+    "VehGas",
+    "Area",
+    "Region"
+  ],
+  "numeric_defaults": {
+    "Exposure": 0.49,
+    "VehPower": 6.0,
+    "VehAge": 6.0,
+    "DrivAge": 44.0,
+    "BonusMalus": 50.0,
+    "Density": 393.0
+  },
+  "categorical_defaults": {
+    "VehBrand": "B12",
+    "VehGas": "Regular",
+    "Area": "C",
+    "Region": "Centre"
+  },
+  "supported_input_aliases": {
+    "IDpol": [
+      "IDpol",
+      "policy_id",
+      "driver_id"
+    ],
+    "Exposure": [
+      "Exposure",
+      "exposure"
+    ],
+    "VehPower": [
+      "VehPower",
+      "vehicle_power",
+      "veh_power",
+      "power"
+    ],
+    "VehAge": [
+      "VehAge",
+      "vehicle_age",
+      "veh_age"
+    ],
+    "DrivAge": [
+      "DrivAge",
+      "driver_age",
+      "age"
+    ],
+    "BonusMalus": [
+      "BonusMalus",
+      "bonus_malus",
+      "bonusmalus"
+    ],
+    "VehBrand": [
+      "VehBrand",
+      "vehicle_brand",
+      "veh_brand",
+      "brand"
+    ],
+    "VehGas": [
+      "VehGas",
+      "vehicle_fuel",
+      "fuel_type",
+      "veh_gas"
+    ],
+    "Area": [
+      "Area",
+      "area"
+    ],
+    "Density": [
+      "Density",
+      "density",
+      "population_density"
+    ],
+    "Region": [
+      "Region",
+      "region"
+    ],
+    "ClaimNb": [
+      "ClaimNb",
+      "claim_nb",
+      "claim_count"
+    ],
+    "ClaimAmount": [
+      "ClaimAmount",
+      "claim_amount"
+    ]
+  },
+  "optional_simulated_features": [
+    "simulated_vehicle_type",
+    "simulated_daily_mileage",
+    "simulated_night_driving_level",
+    "simulated_harsh_braking_level",
+    "simulated_accidents_last_2yr",
+    "simulated_claim_history"
+  ],
+  "categorical_options": {
+    "VehBrand": [
+      "B1",
+      "B10",
+      "B11",
+      "B12",
+      "B13",
+      "B14",
+      "B2",
+      "B3",
+      "B4",
+      "B5",
+      "B6"
+    ],
+    "VehGas": [
+      "Diesel",
+      "Regular"
+    ],
+    "Area": [
+      "A",
+      "B",
+      "C",
+      "D",
+      "E",
+      "F"
+    ],
+    "Region": [
+      "Alsace",
+      "Aquitaine",
+      "Auvergne",
+      "Basse-Normandie",
+      "Bourgogne",
+      "Bretagne",
+      "Centre",
+      "Champagne-Ardenne",
+      "Corse",
+      "Franche-Comte",
+      "Haute-Normandie",
+      "Ile-de-France",
+      "Languedoc-Roussillon",
+      "Limousin",
+      "Midi-Pyrenees",
+      "Nord-Pas-de-Calais",
+      "Pays-de-la-Loire",
+      "Picardie",
+      "Poitou-Charentes",
+      "Provence-Alpes-Cotes-D'Azur",
+      "Rhone-Alpes"
+    ]
+  },
+  "numeric_ranges": {
+    "Exposure": {
+      "min": 0.00273224,
+      "max": 2.01
+    },
+    "VehPower": {
+      "min": 4.0,
+      "max": 15.0
+    },
+    "VehAge": {
+      "min": 0.0,
+      "max": 100.0
+    },
+    "DrivAge": {
+      "min": 18.0,
+      "max": 100.0
+    },
+    "BonusMalus": {
+      "min": 50.0,
+      "max": 230.0
+    },
+    "Density": {
+      "min": 1.0,
+      "max": 27000.0
+    }
+  },
+  "risk_thresholds": {
+    "low_max": 150.0,
+    "medium_max": 400.0
+  },
+  "portfolio_baselines": {
+    "annual_frequency": 1.0,
+    "claim_severity": 2129.1603302175754,
+    "annualized_expected_loss": 243.15262258037282
+  },
+  "pricing_config": {
+    "expense_loading": 0.3,
+    "fixed_expense": 50.0,
+    "minimum_premium": 50.0,
+    "risk_score_scale": 100.0,
+    "risk_score_baseline_floor": 1.0,
+    "annualized_expected_loss_thresholds": {
+      "low_max": 150.0,
+      "medium_max": 400.0
+    }
+  },
+  "modeling_config": {
+    "random_seed": 42,
+    "evaluation": {
+      "test_size": 0.2
+    },
+    "models": {
+      "frequency": {
+        "alpha": 0.0001,
+        "max_iter": 1000
+      },
+      "severity": {
+        "alpha": 0.0001,
+        "max_iter": 1000
+      }
+    },
+    "feature_engineering": {
+      "exposure_lower_bound": 1e-06,
+      "numeric_defaults": {
+        "Exposure": 0.49,
+        "VehPower": 6.0,
+        "VehAge": 6.0,
+        "DrivAge": 44.0,
+        "BonusMalus": 50.0,
+        "Density": 393.0
+      },
+      "categorical_defaults": {
+        "VehBrand": "B12",
+        "VehGas": "Regular",
+        "Area": "C",
+        "Region": "Centre"
+      },
+      "numeric_clip_bounds": {
+        "Exposure": {
+          "min": 1e-06,
+          "max": 2.5
+        },
+        "VehPower": {
+          "min": 1.0,
+          "max": 20.0
+        },
+        "VehAge": {
+          "min": 0.0,
+          "max": 100.0
+        },
+        "DrivAge": {
+          "min": 18.0,
+          "max": 100.0
+        },
+        "BonusMalus": {
+          "min": 50.0,
+          "max": 350.0
+        },
+        "Density": {
+          "min": 0.0,
+          "max": 27000.0
+        }
+      },
+      "optional_simulated_features": [
+        "simulated_vehicle_type",
+        "simulated_daily_mileage",
+        "simulated_night_driving_level",
+        "simulated_harsh_braking_level",
+        "simulated_accidents_last_2yr",
+        "simulated_claim_history"
+      ]
+    },
+    "pricing": {
+      "expense_loading": 0.3,
+      "fixed_expense": 50.0,
+      "minimum_premium": 50.0,
+      "risk_score_scale": 100.0,
+      "risk_score_baseline_floor": 1.0,
+      "annualized_expected_loss_thresholds": {
+        "low_max": 150.0,
+        "medium_max": 400.0
+      }
+    }
+  },
+  "dataset_summary": {
+    "policy_rows": 678013,
+    "claim_rows": 26444
+  },
+  "data_quality": {
+    "frequency_rows": 678013,
+    "severity_rows": 26639,
+    "policies_with_claims": 34060,
+    "policies_with_paid_amounts": 24944,
+    "positive_claim_count_without_paid_amount": 9116,
+    "severity_rows_without_matching_policy": 195,
+    "claim_rows_used_for_severity_model": 26444
+  }
+}

@@ -1,0 +1,68 @@
+{
+  "run_id": "20260420T164457Z",
+  "generated_at_utc": "2026-04-20T16:44:57.045305+00:00",
+  "model_parameters": {
+    "frequency": {
+      "alpha": 0.0001,
+      "max_iter": 1000
+    },
+    "severity": {
+      "alpha": 0.0001,
+      "max_iter": 1000
+    }
+  },
+  "evaluation_metrics": {
+    "frequency": {
+      "rmse": 0.23964565796978565,
+      "mean_poisson_deviance": 0.32017398920629203,
+      "observed_average_claim_count": 0.05336165129090065,
+      "predicted_average_claim_count": 0.053183074984130926
+    },
+    "severity": {
+      "mae": 2046.9781204394849,
+      "rmse": 9346.763865515548,
+      "observed_average_severity": 2021.0088069578371,
+      "predicted_average_severity": 2278.335809211359
+    }
+  },
+  "dataset_version": {
+    "frequency_dataset": {
+      "path": "D:\\Project\\AI-Driven-Motor-Insurance-Pricing-System\\data\\freMTPL2freq.csv",
+      "exists": true,
+      "size_bytes": 38240974,
+      "modified_utc": "2026-04-20T13:37:31.144693+00:00",
+      "sha256": "66477b983cc81b23f75590ad72e00ad4cc4b92a956b22b93732adb6070f006fb"
+    },
+    "severity_dataset": {
+      "path": "D:\\Project\\AI-Driven-Motor-Insurance-Pricing-System\\data\\freMTPL2sev.csv",
+      "exists": true,
+      "size_bytes": 403127,
+      "modified_utc": "2026-04-20T13:37:31.163422+00:00",
+      "sha256": "27bdce2d8628e06236afa5d1a174f5885148032f003cb635305e600c2fa922ad"
+    }
+  },
+  "dataset_summary": {
+    "policy_rows": 678013,
+    "claim_rows": 26444
+  },
+  "data_quality": {
+    "frequency_rows": 678013,
+    "severity_rows": 26639,
+    "policies_with_claims": 34060,
+    "policies_with_paid_amounts": 24944,
+    "positive_claim_count_without_paid_amount": 9116,
+    "severity_rows_without_matching_policy": 195,
+    "claim_rows_used_for_severity_model": 26444
+  },
+  "pricing_config": {
+    "expense_loading": 0.3,
+    "fixed_expense": 50.0,
+    "minimum_premium": 50.0,
+    "risk_score_scale": 100.0,
+    "risk_score_baseline_floor": 1.0,
+    "annualized_expected_loss_thresholds": {
+      "low_max": 150.0,
+      "medium_max": 400.0
+    }
+  }
+}

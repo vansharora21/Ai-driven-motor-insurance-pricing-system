@@ -7,7 +7,7 @@ from typing import Any
 import pandas as pd
 
 from src.config import set_global_determinism
-from src.data_loader import build_inference_frame
+from src.data_loader import DataValidationError, build_inference_frame
 from src.frequency_model import predict_frequency
 from src.model_artifacts import load_artifacts
 from src.pricing_engine import calculate_premium
@@ -49,8 +49,14 @@ def main() -> None:
     output_path = Path(args.output)
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    input_df = pd.read_csv(input_path)
-    scored_df = predict_premiums(input_df)
+    try:
+        input_df = pd.read_csv(input_path)
+        scored_df = predict_premiums(input_df)
+    except (pd.errors.EmptyDataError, pd.errors.ParserError) as exc:
+        raise ValueError(f"Invalid CSV format in {input_path}: {exc}") from exc
+    except DataValidationError as exc:
+        raise ValueError(f"Input validation failed for {input_path}: {exc}") from exc
+
     scored_df.to_csv(output_path, index=False)
     print(f"Saved predictions to {output_path.resolve()}")
 

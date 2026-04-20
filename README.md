@@ -1,49 +1,67 @@
 # Motor Insurance Pricing Engine
 
-Production-style motor insurance pricing project built on the real `freMTPL2` French motor insurance datasets.
-
-## What Changed
-
-This repository now uses:
-
-- `data/freMTPL2freq.csv` for claim frequency and policy features
-- `data/freMTPL2sev.csv` for real observed claim severities
-- saved sklearn pipelines for training and inference
-- a Streamlit app that only performs inference
-
-The previous demo-only pieces such as synthetic severity targets and in-app training have been removed from the main workflow.
+Research-grade motor insurance pricing system built on the real freMTPL2 frequency and severity datasets.
 
 ## Project Structure
 
 ```text
 .
-|- app.py                     # Streamlit inference UI
-|- train.py                   # Full training, evaluation, and artifact generation
-|- predict.py                 # CLI and reusable inference entry point
-|- run_pipeline.py            # Backward-compatible alias to train.py
+|- app.py                        # Streamlit inference UI
+|- train.py                      # Backward-compatible wrapper for scripts/train.py
+|- predict.py                    # Backward-compatible wrapper for scripts/predict.py
+|- run_pipeline.py               # Backward-compatible training alias
+|- pyproject.toml                # Packaging and test configuration
+|- requirements.txt
+|- scripts/
+|  |- train.py                   # Canonical training entry point
+|  |- predict.py                 # Canonical batch inference entry point
+|- src/
+|  |- __init__.py                # Python package marker
+|  |- config.py
+|  |- data_loader.py
+|  |- feature_engineering.py
+|  |- frequency_model.py
+|  |- severity_model.py
+|  |- pricing_engine.py
+|  |- model_artifacts.py
+|  |- experiment_tracking.py
+|  |- visualization.py
+|  |- fraud_detection.py
+|  |- simulation.py
+|- configs/
+|  |- modeling_config.json       # Canonical modeling config
+|- config/
+|  |- modeling_config.json       # Legacy fallback config
 |- data/
-|  |- freMTPL2freq.csv        # Policy-level exposure and claim counts
-|  |- freMTPL2sev.csv         # Claim-level paid amounts
-|  |- sample_batch.csv        # Optional batch sample generated from real data
-|- artifacts/
+|  |- freMTPL2freq.csv
+|  |- freMTPL2sev.csv
+|- models/
 |  |- frequency_model.joblib
 |  |- severity_model.joblib
 |  |- model_metadata.json
 |- results/
 |  |- evaluation/metrics.json
+|  |- experiments/<run_id>/run_summary.json
 |  |- plots/
-|  |- premium_reports/top_premiums.csv
-|- src/
-|  |- data_loader.py          # Dataset loading, cleaning, and merge logic
-|  |- feature_engineering.py  # Shared feature cleaning and preprocessing
-|  |- frequency_model.py      # Poisson regression pipeline
-|  |- severity_model.py       # Gamma regression pipeline
-|  |- pricing_engine.py       # Premium calculation and risk-band logic
-|  |- model_artifacts.py      # Save/load helpers for models and metadata
-|  |- visualization.py        # Evaluation and portfolio plots
-|  |- fraud_detection.py      # Optional post-pricing anomaly detector
-|  |- simulation.py           # Optional portfolio stress testing helper
+|  |- premium_reports/
+|- tests/
+|  |- conftest.py
+|  |- test_data_preprocessing.py
+|  |- test_feature_engineering.py
+|  |- test_pricing_logic.py
+|  |- test_model_predictions.py
 ```
+
+## Input Validation
+
+Validation is enforced for both training datasets and user-uploaded inference CSV files:
+
+- required columns are checked and missing column names are reported
+- numeric schema is validated for required numeric fields
+- missing values in required fields trigger clear validation errors
+- alias columns are supported for inference input normalization
+
+Validation errors raise DataValidationError with actionable messages.
 
 ## Training
 
@@ -53,53 +71,64 @@ Install dependencies:
 pip install -r requirements.txt
 ```
 
-Train models and generate artifacts:
+Train and evaluate models:
+
+```bash
+python -m scripts.train
+```
+
+Backward-compatible command (still supported):
 
 ```bash
 python train.py
 ```
 
-This will:
+Training outputs:
 
-- load and clean `freMTPL2freq` and `freMTPL2sev`
-- merge them by `IDpol`
-- train a Poisson frequency model and Gamma severity model
-- evaluate both on holdout sets
-- save joblib artifacts and evaluation metrics
-- generate plots and a `top_premiums.csv` report
+- model binaries and metadata under models/
+- evaluation metrics under results/evaluation/
+- portfolio plots and premium reports under results/
+- structured experiment run records under results/experiments/
+
+## Experiment Tracking
+
+Each training run saves:
+
+- model parameters from configuration
+- evaluation metrics for frequency and severity models
+- dataset version metadata (file path, size, timestamp, sha256)
+- dataset summary and data quality statistics
+
+These records are written to results/experiments/<timestamp>/run_summary.json.
 
 ## Inference
 
-Run batch inference from the command line:
+Run batch inference:
+
+```bash
+python -m scripts.predict --input data/sample_batch.csv --output results/premium_reports/predictions.csv
+```
+
+Backward-compatible command:
 
 ```bash
 python predict.py --input data/sample_batch.csv --output results/premium_reports/predictions.csv
 ```
 
-Expected input columns:
-
-```text
-IDpol, Exposure, VehPower, VehAge, DrivAge, BonusMalus, VehBrand, VehGas, Area, Density, Region
-```
-
 ## Streamlit App
-
-Launch the app:
 
 ```bash
 streamlit run app.py
 ```
 
-The app keeps the same three main workflows:
+The app validates uploaded CSV files and returns clear, user-friendly errors for malformed files or schema violations.
 
-- single-policy premium calculation
-- batch CSV scoring
-- portfolio analytics based on saved training outputs
+## Testing
 
-## Optional Utilities
+Run unit tests:
 
-- `generate_mock_data.py`: creates a realistic sample batch file from freMTPL2
-- `process_responses.py`: exports a clean batch template from the frequency dataset
-- `create_notebook.py`: generates a Jupyter notebook for the new real-data workflow
-- `src/fraud_detection.py`: optional anomaly detection on scored portfolios
-- `src/simulation.py`: optional stress testing on already prepared policy data
+```bash
+pytest -q
+```
+
+Coverage includes preprocessing validation, feature engineering, pricing logic, and model prediction behavior.

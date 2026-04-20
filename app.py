@@ -6,6 +6,7 @@ import pandas as pd
 import streamlit as st
 
 from predict import predict_premiums
+from src.data_loader import DataValidationError
 from src.model_artifacts import load_artifacts
 
 st.set_page_config(page_title="Motor Insurance Pricing", layout="wide")
@@ -141,8 +142,18 @@ with tab_upload:
 
     uploaded_file = st.file_uploader("Upload Policy CSV", type=["csv"])
     if uploaded_file is not None:
-        batch_df = pd.read_csv(uploaded_file)
-        scored_batch = predict_premiums(batch_df, artifacts)
+        try:
+            batch_df = pd.read_csv(uploaded_file)
+            scored_batch = predict_premiums(batch_df, artifacts)
+        except (pd.errors.EmptyDataError, pd.errors.ParserError) as exc:
+            st.error(f"Invalid CSV format: {exc}")
+            st.stop()
+        except DataValidationError as exc:
+            st.error(f"Input validation failed: {exc}")
+            st.stop()
+        except Exception as exc:
+            st.error(f"Unexpected scoring error: {exc}")
+            st.stop()
 
         st.success(f"Scored {len(scored_batch)} policies.")
 
