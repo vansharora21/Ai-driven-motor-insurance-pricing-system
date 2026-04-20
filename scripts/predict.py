@@ -16,15 +16,15 @@ from src.severity_model import predict_severity
 
 def predict_premiums(input_df: pd.DataFrame, artifacts: dict[str, Any] | None = None) -> pd.DataFrame:
     """Score arbitrary policy rows using the saved production artifacts."""
-    artifacts = artifacts or load_artifacts()
-    metadata = artifacts["metadata"]
+    loaded_artifacts = artifacts or load_artifacts()
+    metadata = loaded_artifacts["metadata"]
     set_global_determinism(int(metadata.get("random_seed", 42)))
 
     prepared_df = build_inference_frame(input_df, metadata)
-    annual_frequency = predict_frequency(artifacts["frequency_model"], prepared_df)
-    expected_severity = predict_severity(artifacts["severity_model"], prepared_df)
+    annual_frequency = predict_frequency(loaded_artifacts["frequency_model"], prepared_df)
+    expected_severity = predict_severity(loaded_artifacts["severity_model"], prepared_df)
 
-    scored = calculate_premium(
+    return calculate_premium(
         prepared_df,
         annual_frequency,
         expected_severity,
@@ -32,10 +32,10 @@ def predict_premiums(input_df: pd.DataFrame, artifacts: dict[str, Any] | None = 
         risk_thresholds=metadata.get("risk_thresholds"),
         portfolio_baselines=metadata.get("portfolio_baselines"),
     )
-    return scored
 
 
 def main() -> None:
+    """CLI entry point for batch premium scoring."""
     parser = argparse.ArgumentParser(description="Run inference with the trained motor pricing models.")
     parser.add_argument("--input", required=True, help="Path to a CSV file containing policy features.")
     parser.add_argument(

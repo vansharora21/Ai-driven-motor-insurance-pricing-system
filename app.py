@@ -119,15 +119,17 @@ with tab_calc:
         result = scored.iloc[0]
 
         st.subheader("Pricing Results")
-        metric_col1, metric_col2, metric_col3, metric_col4 = st.columns(4)
+        metric_col1, metric_col2, metric_col3, metric_col4, metric_col5 = st.columns(5)
         metric_col1.metric("Final Premium", f"{result['final_premium']:,.2f}")
         metric_col2.metric("Pure Premium", f"{result['pure_premium']:,.2f}")
         metric_col3.metric("Expected Claim Count", f"{result['predicted_claim_count']:.4f}")
         metric_col4.metric("Risk Category", result["risk_category"])
+        metric_col5.metric("Risk Score", f"{result['risk_score']:.1f}")
 
-        detail_col1, detail_col2 = st.columns(2)
+        detail_col1, detail_col2, detail_col3 = st.columns(3)
         detail_col1.metric("Annual Claim Frequency", f"{result['predicted_annual_frequency']:.4f}")
         detail_col2.metric("Expected Claim Severity", f"{result['predicted_claim_severity']:,.2f}")
+        detail_col3.metric("Expected Loss", f"{result['expected_loss']:,.2f}")
 
 with tab_upload:
     st.header("Batch Risk Analyzer")
@@ -159,8 +161,11 @@ with tab_upload:
             "predicted_annual_frequency",
             "predicted_claim_count",
             "predicted_claim_severity",
+            "annualized_expected_loss",
+            "expected_loss",
             "pure_premium",
             "final_premium",
+            "risk_score",
             "risk_category",
         ]
         st.dataframe(scored_batch[display_columns], use_container_width=True)

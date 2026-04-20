@@ -6,23 +6,33 @@ from sklearn.linear_model import GammaRegressor
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 from sklearn.pipeline import Pipeline
 
+from src.config import get_model_config
 from src.feature_engineering import MODEL_FEATURES, SEVERITY_TARGET, build_preprocessor
+
+MODEL_CONFIG = get_model_config()
 
 
 def train_severity_model(
     df: pd.DataFrame,
-    alpha: float = 1e-4,
-    max_iter: int = 1000,
+    alpha: float | None = None,
+    max_iter: int | None = None,
 ) -> Pipeline:
     """Train a Gamma regression model on observed claim severities."""
     train_df = df[df[SEVERITY_TARGET] > 0].copy()
     if train_df.empty:
         raise ValueError("Severity training data is empty after filtering positive claims.")
 
+    severity_config = MODEL_CONFIG["severity"]
     model = Pipeline(
         steps=[
             ("preprocessor", build_preprocessor()),
-            ("regressor", GammaRegressor(alpha=alpha, max_iter=max_iter)),
+            (
+                "regressor",
+                GammaRegressor(
+                    alpha=float(alpha if alpha is not None else severity_config["alpha"]),
+                    max_iter=int(max_iter if max_iter is not None else severity_config["max_iter"]),
+                ),
+            ),
         ]
     )
     model.fit(train_df[MODEL_FEATURES], train_df[SEVERITY_TARGET])

@@ -6,6 +6,8 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 
+from src.config import get_random_seed
+
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 PLOTS_DIR = PROJECT_ROOT / "results" / "plots"
 REPORTS_DIR = PROJECT_ROOT / "results" / "premium_reports"
@@ -16,6 +18,26 @@ def ensure_output_dirs() -> None:
     PLOTS_DIR.mkdir(parents=True, exist_ok=True)
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
     EVALUATION_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def _save_current_figure(save_path: Path) -> Path:
+    try:
+        plt.savefig(save_path)
+        return save_path
+    except PermissionError:
+        fallback_path = save_path.with_name(f"{save_path.stem}_latest{save_path.suffix}")
+        plt.savefig(fallback_path)
+        return fallback_path
+
+
+def _save_dataframe(df: pd.DataFrame, output_path: Path) -> Path:
+    try:
+        df.to_csv(output_path, index=False)
+        return output_path
+    except PermissionError:
+        fallback_path = output_path.with_name(f"{output_path.stem}_latest{output_path.suffix}")
+        df.to_csv(fallback_path, index=False)
+        return fallback_path
 
 
 def plot_frequency_calibration(actual: pd.Series, predicted: pd.Series, save_path: Path | None = None) -> Path:
@@ -43,9 +65,9 @@ def plot_frequency_calibration(actual: pd.Series, predicted: pd.Series, save_pat
     plt.ylabel("Average Claim Count")
     plt.legend()
     plt.tight_layout()
-    plt.savefig(save_path)
+    output_path = _save_current_figure(save_path)
     plt.close()
-    return save_path
+    return output_path
 
 
 def plot_severity_predictions(actual: pd.Series, predicted: pd.Series, save_path: Path | None = None) -> Path:
@@ -55,7 +77,7 @@ def plot_severity_predictions(actual: pd.Series, predicted: pd.Series, save_path
 
     plot_df = pd.DataFrame({"actual": actual, "predicted": predicted})
     if len(plot_df) > 5000:
-        plot_df = plot_df.sample(5000, random_state=42)
+        plot_df = plot_df.sample(5000, random_state=get_random_seed())
 
     axis_limit = max(plot_df["actual"].max(), plot_df["predicted"].max())
     plt.figure(figsize=(8, 8))
@@ -65,9 +87,9 @@ def plot_severity_predictions(actual: pd.Series, predicted: pd.Series, save_path
     plt.xlabel("Actual Claim Amount")
     plt.ylabel("Predicted Claim Amount")
     plt.tight_layout()
-    plt.savefig(save_path)
+    output_path = _save_current_figure(save_path)
     plt.close()
-    return save_path
+    return output_path
 
 
 def plot_premium_distribution(df: pd.DataFrame, save_path: Path | None = None) -> Path:
@@ -82,9 +104,9 @@ def plot_premium_distribution(df: pd.DataFrame, save_path: Path | None = None) -
     plt.xlabel("Final Premium (log scale)")
     plt.ylabel("Policy Count")
     plt.tight_layout()
-    plt.savefig(save_path)
+    output_path = _save_current_figure(save_path)
     plt.close()
-    return save_path
+    return output_path
 
 
 def plot_risk_distribution(df: pd.DataFrame, save_path: Path | None = None) -> Path:
@@ -107,9 +129,9 @@ def plot_risk_distribution(df: pd.DataFrame, save_path: Path | None = None) -> P
     plt.xlabel("Risk Category")
     plt.ylabel("Policy Count")
     plt.tight_layout()
-    plt.savefig(save_path)
+    output_path = _save_current_figure(save_path)
     plt.close()
-    return save_path
+    return output_path
 
 
 def save_top_premiums(df: pd.DataFrame, filename: str = "top_premiums.csv", top_n: int = 1000) -> Path:
@@ -121,11 +143,13 @@ def save_top_premiums(df: pd.DataFrame, filename: str = "top_premiums.csv", top_
         "predicted_annual_frequency",
         "predicted_claim_count",
         "predicted_claim_severity",
+        "annualized_expected_loss",
+        "expected_loss",
         "pure_premium",
         "final_premium",
+        "risk_score",
         "risk_category",
     ]
     report_df = df[report_columns].sort_values(by="final_premium", ascending=False).head(top_n)
     output_path = REPORTS_DIR / filename
-    report_df.to_csv(output_path, index=False)
-    return output_path
+    return _save_dataframe(report_df, output_path)

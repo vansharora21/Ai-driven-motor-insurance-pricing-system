@@ -14,6 +14,7 @@ from src.config import (
     set_global_determinism,
 )
 from src.data_loader import prepare_model_datasets
+from src.experiment_tracking import persist_experiment_run
 from src.feature_engineering import (
     CATEGORICAL_FEATURES,
     EXPOSURE_COLUMN,
@@ -47,7 +48,7 @@ def _build_metadata(
 ) -> dict[str, object]:
     defaults = build_default_metadata(policy_df)
 
-    metadata = {
+    return {
         "trained_at_utc": datetime.now(timezone.utc).isoformat(),
         "random_seed": random_seed,
         "input_columns": INPUT_COLUMNS,
@@ -77,10 +78,10 @@ def _build_metadata(
         },
         "data_quality": data_quality,
     }
-    return metadata
 
 
 def main() -> None:
+    """Train, evaluate, persist artifacts, and emit experiment-tracking outputs."""
     modeling_config = load_modeling_config()
     random_seed = set_global_determinism(get_random_seed(modeling_config))
     evaluation_config = get_evaluation_config(modeling_config)
@@ -157,10 +158,18 @@ def main() -> None:
     )
     save_artifacts(frequency_model, severity_model, metadata, metrics)
 
+    experiment_path = persist_experiment_run(
+        metadata=metadata,
+        metrics=metrics,
+        model_config=modeling_config.get("models", {}),
+        data_quality=data_quality,
+    )
+
     print("Training complete.")
-    print(f"Saved model artifacts to {Path('artifacts').resolve()}")
+    print(f"Saved model artifacts to {Path('models').resolve()}")
     print(f"Saved evaluation metrics to {Path('results/evaluation/metrics.json').resolve()}")
     print(f"Saved premium report to {top_premiums_path.resolve()}")
+    print(f"Saved experiment run summary to {experiment_path.resolve()}")
 
 
 if __name__ == "__main__":

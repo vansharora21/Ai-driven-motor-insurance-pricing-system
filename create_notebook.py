@@ -9,24 +9,27 @@ This notebook walks through the production-grade training flow using the real fr
 
     code_imports = """from sklearn.model_selection import train_test_split
 
+from src.config import get_pricing_config, get_random_seed
 from src.data_loader import prepare_model_datasets
 from src.frequency_model import train_frequency_model, predict_claim_count, evaluate_frequency_model
-from src.pricing_engine import DEFAULT_PRICING_CONFIG, calculate_premium, compute_risk_thresholds
+from src.pricing_engine import calculate_premium, compute_portfolio_baselines, compute_risk_thresholds
 from src.severity_model import train_severity_model, predict_severity, evaluate_severity_model"""
 
     code_load = """policy_df, claim_df, data_quality = prepare_model_datasets()
 policy_df.head()"""
 
-    code_split = """frequency_train, frequency_test = train_test_split(
+    code_split = """random_seed = get_random_seed()
+
+frequency_train, frequency_test = train_test_split(
     policy_df,
     test_size=0.2,
-    random_state=42,
+    random_state=random_seed,
     stratify=policy_df['has_claim'],
 )
 severity_train, severity_test = train_test_split(
     claim_df,
     test_size=0.2,
-    random_state=42,
+    random_state=random_seed,
 )"""
 
     code_train = """frequency_model = train_frequency_model(frequency_train)
@@ -37,23 +40,20 @@ severity_metrics = evaluate_severity_model(severity_model, severity_test)
 
 frequency_metrics, severity_metrics"""
 
-    code_score = """portfolio_frequency = predict_claim_count(frequency_model, policy_df) / policy_df['Exposure']
-portfolio_severity = predict_severity(severity_model, policy_df)
+    code_score = """pricing_config = get_pricing_config()
 
-preliminary = calculate_premium(
-    policy_df,
-    portfolio_frequency,
-    portfolio_severity,
-    pricing_config=DEFAULT_PRICING_CONFIG,
-)
-risk_thresholds = compute_risk_thresholds(preliminary['pure_premium'])
+portfolio_frequency = predict_claim_count(frequency_model, policy_df) / policy_df['Exposure']
+portfolio_severity = predict_severity(severity_model, policy_df)
+portfolio_baselines = compute_portfolio_baselines(portfolio_frequency, portfolio_severity, pricing_config=pricing_config)
+risk_thresholds = compute_risk_thresholds(pricing_config=pricing_config)
 
 scored_portfolio = calculate_premium(
     policy_df,
     portfolio_frequency,
     portfolio_severity,
-    pricing_config=DEFAULT_PRICING_CONFIG,
+    pricing_config=pricing_config,
     risk_thresholds=risk_thresholds,
+    portfolio_baselines=portfolio_baselines,
 )
 
 scored_portfolio[['IDpol', 'predicted_claim_count', 'predicted_claim_severity', 'final_premium', 'risk_category']].head()"""

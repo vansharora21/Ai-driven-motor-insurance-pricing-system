@@ -6,6 +6,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from src.config import get_feature_config
 from src.feature_engineering import (
     CATEGORICAL_FEATURES,
     EXPOSURE_COLUMN,
@@ -15,6 +16,9 @@ from src.feature_engineering import (
     SEVERITY_TARGET,
     engineer_features,
 )
+
+FEATURE_CONFIG = get_feature_config()
+EXPOSURE_LOWER_BOUND = float(FEATURE_CONFIG["exposure_lower_bound"])
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_FREQUENCY_PATH = PROJECT_ROOT / "data" / "freMTPL2freq.csv"
@@ -71,7 +75,7 @@ def clean_frequency_data(df: pd.DataFrame) -> pd.DataFrame:
     df[POLICY_ID_COLUMN] = df[POLICY_ID_COLUMN].astype(int)
 
     df[FREQUENCY_TARGET] = df[FREQUENCY_TARGET].fillna(0).clip(lower=0).round().astype(int)
-    df[EXPOSURE_COLUMN] = df[EXPOSURE_COLUMN].fillna(1.0).clip(lower=1e-6)
+    df[EXPOSURE_COLUMN] = df[EXPOSURE_COLUMN].fillna(1.0).clip(lower=EXPOSURE_LOWER_BOUND)
 
     for column in CATEGORICAL_FEATURES:
         df[column] = df[column].fillna("Unknown").astype(str).str.strip()

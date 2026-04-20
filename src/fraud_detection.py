@@ -4,6 +4,8 @@ import numpy as np
 import pandas as pd
 from sklearn.ensemble import IsolationForest
 
+from src.config import get_random_seed
+
 OPTIONAL_ANOMALY_FEATURES = [
     "predicted_claim_count",
     "predicted_claim_severity",
@@ -26,7 +28,7 @@ def detect_anomalies(df: pd.DataFrame, contamination: float = 0.01) -> tuple[pd.
         raise ValueError(f"Missing anomaly-detection columns: {missing_columns}")
 
     scored = df.copy()
-    model = IsolationForest(contamination=contamination, random_state=42)
+    model = IsolationForest(contamination=contamination, random_state=get_random_seed())
     predictions = model.fit_predict(scored[OPTIONAL_ANOMALY_FEATURES].fillna(0))
     scored["anomaly_flag"] = np.where(predictions == -1, 1, 0)
     return scored, model

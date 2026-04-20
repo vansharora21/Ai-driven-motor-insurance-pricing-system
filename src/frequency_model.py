@@ -6,23 +6,35 @@ from sklearn.linear_model import PoissonRegressor
 from sklearn.metrics import mean_poisson_deviance, mean_squared_error
 from sklearn.pipeline import Pipeline
 
+from src.config import get_feature_config, get_model_config
 from src.feature_engineering import EXPOSURE_COLUMN, FREQUENCY_TARGET, MODEL_FEATURES, build_preprocessor
+
+MODEL_CONFIG = get_model_config()
+FEATURE_CONFIG = get_feature_config()
+EXPOSURE_LOWER_BOUND = float(FEATURE_CONFIG["exposure_lower_bound"])
 
 
 def train_frequency_model(
     df: pd.DataFrame,
-    alpha: float = 1e-4,
-    max_iter: int = 1000,
+    alpha: float | None = None,
+    max_iter: int | None = None,
 ) -> Pipeline:
     """Train a Poisson frequency model on claims per unit exposure."""
+    frequency_config = MODEL_CONFIG["frequency"]
     model = Pipeline(
         steps=[
             ("preprocessor", build_preprocessor()),
-            ("regressor", PoissonRegressor(alpha=alpha, max_iter=max_iter)),
+            (
+                "regressor",
+                PoissonRegressor(
+                    alpha=float(alpha if alpha is not None else frequency_config["alpha"]),
+                    max_iter=int(max_iter if max_iter is not None else frequency_config["max_iter"]),
+                ),
+            ),
         ]
     )
 
-    exposure = df[EXPOSURE_COLUMN].clip(lower=1e-6)
+    exposure = df[EXPOSURE_COLUMN].clip(lower=EXPOSURE_LOWER_BOUND)
     target_frequency = df[FREQUENCY_TARGET] / exposure
     model.fit(df[MODEL_FEATURES], target_frequency, regressor__sample_weight=exposure)
     return model

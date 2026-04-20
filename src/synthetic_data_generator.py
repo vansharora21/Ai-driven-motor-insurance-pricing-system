@@ -4,6 +4,8 @@ from pathlib import Path
 
 import pandas as pd
 
+from src.config import get_random_seed
+
 FEATURE_COLUMNS = [
     "IDpol",
     "Exposure",
@@ -31,7 +33,11 @@ def generate_synthetic_data(
     real frequency dataset to produce a feature-only batch file for demos.
     """
     real_data = pd.read_csv(real_data_path)
-    sampled = real_data[FEATURE_COLUMNS].sample(n=num_rows, replace=True, random_state=42).reset_index(drop=True)
+    sampled = real_data[FEATURE_COLUMNS].sample(
+        n=num_rows,
+        replace=True,
+        random_state=get_random_seed(),
+    ).reset_index(drop=True)
     sampled.to_csv(output_path, index=False)
     print(f"Saved {num_rows} bootstrap-sampled policies to {output_path}")
     return sampled
