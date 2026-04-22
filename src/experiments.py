@@ -11,8 +11,9 @@ import pandas as pd
 
 from src.config import get_experiment_config, get_model_config, get_random_seed
 from src.frequency_model import evaluate_frequency_model, train_frequency_model
-from src.model_artifacts import EVALUATION_DIR
+from src.model_artifacts import EVALUATION_DIR, PLOTS_DIR
 from src.severity_model import evaluate_severity_model, train_severity_model
+from src.visualization import plot_feature_importance
 
 FREQUENCY_EXPERIMENT_MODELS = ["poisson", "random_forest", "xgboost"]
 SEVERITY_EXPERIMENT_MODELS = ["gamma", "random_forest", "xgboost"]
@@ -116,6 +117,21 @@ def run_model_comparison_experiments(
 
     comparison_results: dict[str, dict[str, object]] = {}
     total_runs = len(frequency_models) * len(severity_models)
+    generated_feature_importance_labels: set[str] = set()
+
+    def _save_feature_importance_plot(model: object, role: str, model_name: str) -> None:
+        feature_importance_label = f"{role}_{model_name}"
+        if feature_importance_label in generated_feature_importance_labels:
+            return
+
+        saved_path = plot_feature_importance(
+            model,
+            save_path=PLOTS_DIR / f"feature_importance_{feature_importance_label}.png",
+            model_label=feature_importance_label,
+        )
+        if saved_path is not None:
+            generated_feature_importance_labels.add(feature_importance_label)
+            print(f"Saved feature importance plot to {saved_path.resolve()}")
 
     for run_index, (frequency_model_name, severity_model_name) in enumerate(
         product(frequency_models, severity_models),
@@ -140,6 +156,8 @@ def run_model_comparison_experiments(
 
             frequency_metrics = evaluate_frequency_model(frequency_model, frequency_test)
             severity_metrics = evaluate_severity_model(severity_model, severity_test)
+            _save_feature_importance_plot(frequency_model, "frequency", frequency_model_name)
+            _save_feature_importance_plot(severity_model, "severity", severity_model_name)
             elapsed_seconds = float(perf_counter() - started_at)
 
             comparison_results[key] = {

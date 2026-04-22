@@ -9,8 +9,10 @@ import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from matplotlib.ticker import PercentFormatter
 import pandas as pd
 import seaborn as sns
+from sklearn.pipeline import Pipeline
 
 from src.config import get_random_seed
 
@@ -21,6 +23,8 @@ EVALUATION_DIR = PROJECT_ROOT / "results" / "evaluation"
 MODEL_COMPARISON_RMSE_PLOT = PLOTS_DIR / "model_comparison_rmse.png"
 PREDICTED_VS_ACTUAL_PLOT = PLOTS_DIR / "predicted_vs_actual.png"
 ERROR_DISTRIBUTION_PLOT = PLOTS_DIR / "error_distribution.png"
+FEATURE_IMPORTANCE_PLOT_PREFIX = "feature_importance_"
+FEATURE_IMPORTANCE_SUPPORTED_REGRESSORS = {"RandomForestRegressor", "XGBRegressor"}
 
 _PREDICTION_COLUMN_PAIRS: tuple[tuple[str, str], ...] = (
     ("actual", "predicted"),
@@ -99,6 +103,105 @@ def _pretty_label(column_name: str) -> str:
     return _COLUMN_LABELS.get(column_name, column_name.replace("_", " ").strip().title())
 
 
+def _resolve_tree_model_label(regressor: Any) -> str | None:
+    class_name = regressor.__class__.__name__.lower()
+    if class_name == "randomforestregressor":
+        return "random_forest"
+    if class_name == "xgbregressor":
+        return "xgboost"
+    return None
+
+
+def _snake_case_name(name: str) -> str:
+    normalized = []
+    for character in name:
+        if character.isupper() and normalized and normalized[-1] != "_":
+            normalized.append("_")
+        normalized.append(character.lower())
+    return "".join(normalized).replace("__", "_").strip("_")
+
+
+def _clean_feature_name(feature_name: str) -> str:
+    cleaned_name = str(feature_name)
+    if "__" in cleaned_name:
+        _, cleaned_name = cleaned_name.split("__", 1)
+    if cleaned_name.startswith("numeric__"):
+        cleaned_name = cleaned_name.split("__", 1)[1]
+    elif cleaned_name.startswith("categorical__"):
+        cleaned_name = cleaned_name.split("__", 1)[1]
+        if "_" in cleaned_name:
+            base_name, category_value = cleaned_name.split("_", 1)
+            cleaned_name = f"{base_name} = {category_value}"
+    return cleaned_name.replace("_", " ")
+
+
+def _extract_feature_importance_frame(model: Any) -> tuple[pd.DataFrame | None, str]:
+    regressor = getattr(model, "named_steps", {}).get("regressor") if hasattr(model, "named_steps") else None
+    regressor_name = regressor.__class__.__name__ if regressor is not None else model.__class__.__name__
+
+    if regressor_name not in FEATURE_IMPORTANCE_SUPPORTED_REGRESSORS:
+        return None, regressor_name
+
+    feature_importances = getattr(regressor, "feature_importances_", None)
+    preprocessor = getattr(model, "named_steps", {}).get("preprocessor") if hasattr(model, "named_steps") else None
+    if feature_importances is None or preprocessor is None or not hasattr(preprocessor, "get_feature_names_out"):
+        return None, regressor_name
+
+    feature_names = preprocessor.get_feature_names_out()
+    if len(feature_names) != len(feature_importances):
+        raise ValueError(
+            "Feature importance values do not align with the transformed feature names."
+        )
+
+    importance_frame = pd.DataFrame(
+        {
+            "feature": [_clean_feature_name(feature_name) for feature_name in feature_names],
+            "importance": pd.Series(feature_importances, dtype=float),
+        }
+    ).sort_values(by="importance", ascending=False)
+    return importance_frame, regressor_name
+
+
+def plot_feature_importance(
+    model: Any,
+    save_path: Path | None = None,
+    model_label: str | None = None,
+    top_n: int = 10,
+    print_top_n: bool = True,
+) -> Path | None:
+    """Plot feature importance for supported tree-based regressors."""
+    ensure_output_dirs()
+    _set_plot_style()
+
+    importance_frame, regressor_name = _extract_feature_importance_frame(model)
+    if importance_frame is None:
+        return None
+
+    resolved_label = model_label or _snake_case_name(regressor_name)
+    target_path = save_path or (PLOTS_DIR / f"feature_importance_{resolved_label}.png")
+
+    top_features = importance_frame.head(max(1, top_n)).copy()
+    plot_df = top_features.sort_values(by="importance", ascending=True)
+
+    plt.figure(figsize=(10, 6))
+    ax = sns.barplot(data=plot_df, x="importance", y="feature", color="#2563eb")
+    ax.set_title(f"Feature Importance - {resolved_label.replace('_', ' ').title()}")
+    ax.set_xlabel("Importance")
+    ax.set_ylabel("Feature")
+    sns.despine()
+    plt.tight_layout()
+    output_path = _save_current_figure(target_path)
+    plt.close()
+
+    if print_top_n:
+        top_preview = top_features.head(min(top_n, len(top_features))).copy()
+        print(f"Top {len(top_preview)} features for {resolved_label} ({regressor_name}):")
+        for _, row in top_preview.iterrows():
+            print(f"  {row['feature']}: {row['importance']:.6f}")
+
+    return output_path
+
+
 def _resolve_prediction_columns(
     predictions: pd.DataFrame,
     actual_column: str | None = None,
@@ -173,6 +276,77 @@ def _build_model_comparison_frame(model_comparison: Mapping[str, Any] | str | Pa
     if comparison_df.empty:
         raise ValueError("No successful model comparison RMSE values were found in the input payload.")
     return comparison_df
+
+
+def extract_feature_importance(model: Pipeline) -> pd.DataFrame | None:
+    """Extract transformed feature importances from a fitted tree-based pipeline."""
+    if not isinstance(model, Pipeline):
+        return None
+
+    if "preprocessor" not in model.named_steps or "regressor" not in model.named_steps:
+        return None
+
+    regressor = model.named_steps["regressor"]
+    model_label = _resolve_tree_model_label(regressor)
+    if model_label is None or not hasattr(regressor, "feature_importances_"):
+        return None
+
+    preprocessor = model.named_steps["preprocessor"]
+    if not hasattr(preprocessor, "get_feature_names_out"):
+        return None
+
+    feature_names = preprocessor.get_feature_names_out()
+    importances = getattr(regressor, "feature_importances_", None)
+    if importances is None:
+        return None
+
+    importance_df = pd.DataFrame(
+        {
+            "feature": feature_names,
+            "importance": pd.Series(importances, dtype=float),
+        }
+    ).sort_values(by="importance", ascending=False, ignore_index=True)
+    importance_df.attrs["model_label"] = model_label
+    importance_df.attrs["estimator_name"] = regressor.__class__.__name__
+    return importance_df
+
+
+def plot_feature_importance(
+    model: Pipeline,
+    save_path: Path | None = None,
+    top_n: int = 10,
+    model_label: str | None = None,
+) -> Path | None:
+    """Plot feature importance for supported tree-based models and skip GLM models."""
+    ensure_output_dirs()
+    _set_plot_style()
+
+    importance_df = extract_feature_importance(model)
+    if importance_df is None:
+        return None
+
+    regressor = model.named_steps["regressor"]
+    resolved_label = model_label or importance_df.attrs.get("model_label") or _resolve_tree_model_label(regressor)
+    if resolved_label is None:
+        return None
+
+    save_path = save_path or (PLOTS_DIR / f"{FEATURE_IMPORTANCE_PLOT_PREFIX}{resolved_label}.png")
+
+    plot_df = importance_df.head(top_n).sort_values(by="importance", ascending=True)
+    figure_height = max(5.5, 0.45 * len(plot_df) + 2.0)
+
+    plt.figure(figsize=(10.5, figure_height))
+    ax = sns.barplot(data=plot_df, x="importance", y="feature", color="#2563eb")
+    ax.set_title(f"{resolved_label.replace('_', ' ').title()} Feature Importance")
+    ax.set_xlabel("Importance")
+    ax.set_ylabel("Feature")
+    ax.xaxis.set_major_formatter(PercentFormatter(xmax=1.0))
+    ax.set_xlim(0, max(importance_df["importance"].head(top_n).max() * 1.15, 0.01))
+    sns.despine()
+    plt.tight_layout()
+    output_path = _save_current_figure(save_path)
+    plt.close()
+    return output_path
 
 
 def plot_model_comparison_rmse(

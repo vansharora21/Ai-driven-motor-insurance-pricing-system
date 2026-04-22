@@ -31,6 +31,8 @@ from src.pricing_engine import calculate_premium, compute_portfolio_baselines, c
 from src.severity_model import evaluate_severity_model, predict_severity, train_severity_model
 from src.visualization import (
     generate_model_comparison_visualizations,
+    extract_feature_importance,
+    plot_feature_importance,
     plot_frequency_calibration,
     plot_predicted_vs_actual,
     plot_premium_distribution,
@@ -172,6 +174,40 @@ def main() -> None:
     print("Retraining final models on the full datasets...")
     frequency_model = train_frequency_model(policy_df)
     severity_model = train_severity_model(severity_df)
+
+    frequency_importance = extract_feature_importance(frequency_model)
+    severity_importance = extract_feature_importance(severity_model)
+
+    frequency_model_name = str(modeling_config.get("models", {}).get("frequency_model", "frequency"))
+    severity_model_name = str(modeling_config.get("models", {}).get("severity_model", "severity"))
+
+    if frequency_importance is not None:
+        frequency_importance_path = plot_feature_importance(
+            frequency_model,
+            save_path=Path(f"results/plots/feature_importance_frequency_{frequency_model_name}.png"),
+            model_label=f"frequency_{frequency_model_name}",
+        )
+        if frequency_importance_path is not None:
+            print(f"Saved frequency feature importance plot to {frequency_importance_path.resolve()}")
+            print("Top 10 frequency features:")
+            for _, row in frequency_importance.head(10).iterrows():
+                print(f"  {row['feature']}: {row['importance']:.6f}")
+    else:
+        print(f"Skipped frequency feature importance for {frequency_model_name} (unsupported regressor).")
+
+    if severity_importance is not None:
+        severity_importance_path = plot_feature_importance(
+            severity_model,
+            save_path=Path(f"results/plots/feature_importance_severity_{severity_model_name}.png"),
+            model_label=f"severity_{severity_model_name}",
+        )
+        if severity_importance_path is not None:
+            print(f"Saved severity feature importance plot to {severity_importance_path.resolve()}")
+            print("Top 10 severity features:")
+            for _, row in severity_importance.head(10).iterrows():
+                print(f"  {row['feature']}: {row['importance']:.6f}")
+    else:
+        print(f"Skipped severity feature importance for {severity_model_name} (unsupported regressor).")
 
     # Portfolio baselines stabilize relativities and risk scores across prediction batches.
     portfolio_frequency = predict_frequency(frequency_model, policy_df)
