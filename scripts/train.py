@@ -162,8 +162,14 @@ def main() -> None:
     top_premiums_path = save_top_premiums(scored_portfolio)
 
     metrics = {
-        "frequency": frequency_metrics,
-        "severity": severity_metrics,
+        "frequency": {
+            "selected_model": str(modeling_config.get("models", {}).get("frequency_model", "poisson")),
+            **frequency_metrics,
+        },
+        "severity": {
+            "selected_model": str(modeling_config.get("models", {}).get("severity_model", "gamma")),
+            **severity_metrics,
+        },
     }
     metadata = _build_metadata(
         policy_df,

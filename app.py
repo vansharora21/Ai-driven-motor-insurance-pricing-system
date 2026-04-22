@@ -323,13 +323,22 @@ def _render_model_info_tab(metadata: dict[str, Any], metrics: dict[str, Any]) ->
 
     if metrics:
         st.subheader("Saved evaluation metrics")
+        frequency_metrics = metrics.get("frequency", {})
+        severity_metrics = metrics.get("severity", {})
+
+        frequency_metric_values = frequency_metrics.get("metrics", frequency_metrics)
+        severity_metric_values = severity_metrics.get("metrics", severity_metrics)
+
         freq_col1, freq_col2 = st.columns(2)
-        freq_col1.metric("Frequency RMSE", f"{metrics['frequency']['rmse']:.4f}")
-        freq_col2.metric("Frequency Poisson deviance", f"{metrics['frequency']['mean_poisson_deviance']:.4f}")
+        freq_col1.metric("Frequency RMSE", f"{float(frequency_metric_values.get('rmse', 0.0)):.4f}")
+        freq_col2.metric(
+            "Frequency Poisson deviance",
+            f"{float(frequency_metric_values.get('poisson_deviance', frequency_metric_values.get('mean_poisson_deviance', 0.0))):.4f}",
+        )
 
         sev_col1, sev_col2 = st.columns(2)
-        sev_col1.metric("Severity MAE", f"{metrics['severity']['mae']:,.2f}")
-        sev_col2.metric("Severity RMSE", f"{metrics['severity']['rmse']:,.2f}")
+        sev_col1.metric("Severity MAE", f"{float(severity_metric_values.get('mae', 0.0)):,.2f}")
+        sev_col2.metric("Severity RMSE", f"{float(severity_metric_values.get('rmse', 0.0)):,.2f}")
 
     st.subheader("Saved training plots")
     plot_col1, plot_col2 = st.columns(2)

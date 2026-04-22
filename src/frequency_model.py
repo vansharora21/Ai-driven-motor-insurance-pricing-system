@@ -64,8 +64,9 @@ def predict_claim_count(model: Pipeline, df: pd.DataFrame) -> pd.Series:
     return annual_frequency * df[EXPOSURE_COLUMN]
 
 
-def evaluate_frequency_model(model: Pipeline, df: pd.DataFrame) -> dict[str, float]:
+def evaluate_frequency_model(model: Pipeline, df: pd.DataFrame) -> dict[str, Any]:
     """Evaluate holdout claim-count performance using RMSE and Poisson deviance."""
+    regressor_name = model.named_steps["regressor"].__class__.__name__
     observed_claim_count = df[FREQUENCY_TARGET].astype(float)
     predicted_claim_count = predict_claim_count(model, df).clip(lower=1e-9)
 
@@ -73,8 +74,15 @@ def evaluate_frequency_model(model: Pipeline, df: pd.DataFrame) -> dict[str, flo
     poisson_deviance = float(mean_poisson_deviance(observed_claim_count, predicted_claim_count))
 
     return {
-        "rmse": rmse,
-        "mean_poisson_deviance": poisson_deviance,
-        "observed_average_claim_count": float(observed_claim_count.mean()),
-        "predicted_average_claim_count": float(predicted_claim_count.mean()),
+        "model_name": regressor_name,
+        "evaluation_split": "test",
+        "sample_size": int(len(df)),
+        "metrics": {
+            "rmse": rmse,
+            "poisson_deviance": poisson_deviance,
+        },
+        "distribution": {
+            "observed_mean": float(observed_claim_count.mean()),
+            "predicted_mean": float(predicted_claim_count.mean()),
+        },
     }

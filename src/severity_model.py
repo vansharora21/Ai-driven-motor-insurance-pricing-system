@@ -4,7 +4,7 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
-from sklearn.metrics import mean_absolute_error, mean_squared_error
+from sklearn.metrics import mean_absolute_error, mean_gamma_deviance, mean_squared_error
 from sklearn.pipeline import Pipeline
 
 from src.config import get_model_config
@@ -56,8 +56,9 @@ def predict_severity(model: Pipeline, df: pd.DataFrame) -> pd.Series:
     return pd.Series(predicted_severity, index=df.index, name="predicted_claim_severity")
 
 
-def evaluate_severity_model(model: Pipeline, df: pd.DataFrame) -> dict[str, float]:
-    """Evaluate holdout severity performance using MAE and RMSE."""
+def evaluate_severity_model(model: Pipeline, df: pd.DataFrame) -> dict[str, Any]:
+    """Evaluate holdout severity performance using MAE, RMSE, and Gamma deviance."""
+    regressor_name = model.named_steps["regressor"].__class__.__name__
     positive_eval_df = df[df[SEVERITY_TARGET] > 0].copy()
     if positive_eval_df.empty:
         raise ValueError("Severity evaluation data is empty after filtering positive claims.")
@@ -67,10 +68,19 @@ def evaluate_severity_model(model: Pipeline, df: pd.DataFrame) -> dict[str, floa
 
     mae = float(mean_absolute_error(observed_severity, predicted_severity))
     rmse = float(np.sqrt(mean_squared_error(observed_severity, predicted_severity)))
+    gamma_deviance = float(mean_gamma_deviance(observed_severity, predicted_severity))
 
     return {
-        "mae": mae,
-        "rmse": rmse,
-        "observed_average_severity": float(observed_severity.mean()),
-        "predicted_average_severity": float(predicted_severity.mean()),
+        "model_name": regressor_name,
+        "evaluation_split": "test",
+        "sample_size": int(len(positive_eval_df)),
+        "metrics": {
+            "rmse": rmse,
+            "mae": mae,
+            "gamma_deviance": gamma_deviance,
+        },
+        "distribution": {
+            "observed_mean": float(observed_severity.mean()),
+            "predicted_mean": float(predicted_severity.mean()),
+        },
     }
