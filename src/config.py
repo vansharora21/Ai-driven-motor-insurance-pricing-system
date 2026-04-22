@@ -18,14 +18,54 @@ DEFAULT_MODELING_CONFIG: dict[str, Any] = {
     "evaluation": {
         "test_size": 0.2,
     },
+    "experiments": {
+        "enabled": True,
+        "frequency_models": ["poisson", "random_forest", "xgboost"],
+        "severity_models": ["gamma", "random_forest", "xgboost"],
+        "sample_fraction": 0.2,
+        "max_frequency_rows": 30000,
+        "max_severity_rows": 30000,
+        "random_forest_n_estimators": 80,
+        "xgboost_n_estimators": 120,
+    },
     "models": {
+        "frequency_model": "poisson",
+        "severity_model": "gamma",
         "frequency": {
             "alpha": 1e-4,
             "max_iter": 1000,
+            "random_forest": {
+                "n_estimators": 300,
+                "max_depth": None,
+                "min_samples_leaf": 1,
+                "n_jobs": -1,
+            },
+            "xgboost": {
+                "n_estimators": 300,
+                "learning_rate": 0.05,
+                "max_depth": 6,
+                "subsample": 0.8,
+                "colsample_bytree": 0.8,
+                "reg_lambda": 1.0,
+            },
         },
         "severity": {
             "alpha": 1e-4,
             "max_iter": 1000,
+            "random_forest": {
+                "n_estimators": 300,
+                "max_depth": None,
+                "min_samples_leaf": 1,
+                "n_jobs": -1,
+            },
+            "xgboost": {
+                "n_estimators": 400,
+                "learning_rate": 0.05,
+                "max_depth": 6,
+                "subsample": 0.8,
+                "colsample_bytree": 0.8,
+                "reg_lambda": 1.0,
+            },
         },
     },
     "feature_engineering": {
@@ -110,6 +150,11 @@ def get_evaluation_config(config: dict[str, Any] | None = None) -> dict[str, Any
 def get_model_config(config: dict[str, Any] | None = None) -> dict[str, Any]:
     source = config or load_modeling_config()
     return deepcopy(source["models"])
+
+
+def get_experiment_config(config: dict[str, Any] | None = None) -> dict[str, Any]:
+    source = config or load_modeling_config()
+    return deepcopy(source.get("experiments", {}))
 
 
 def get_feature_config(config: dict[str, Any] | None = None) -> dict[str, Any]:

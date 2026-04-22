@@ -7,6 +7,7 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 
 from src.config import (
+    get_experiment_config,
     get_evaluation_config,
     get_pricing_config,
     get_random_seed,
@@ -14,6 +15,7 @@ from src.config import (
     set_global_determinism,
 )
 from src.data_loader import prepare_model_datasets
+from src.experiments import run_model_comparison_experiments
 from src.experiment_tracking import persist_experiment_run
 from src.feature_engineering import (
     CATEGORICAL_FEATURES,
@@ -86,6 +88,7 @@ def main() -> None:
     modeling_config = load_modeling_config()
     random_seed = set_global_determinism(get_random_seed(modeling_config))
     evaluation_config = get_evaluation_config(modeling_config)
+    experiment_config = get_experiment_config(modeling_config)
     pricing_config = get_pricing_config(modeling_config)
 
     print("Loading and preparing freMTPL2 datasets...")
@@ -113,6 +116,18 @@ def main() -> None:
     print("Evaluating holdout performance...")
     frequency_metrics = evaluate_frequency_model(frequency_eval_model, frequency_test)
     severity_metrics = evaluate_severity_model(severity_eval_model, severity_test)
+
+    comparison_path: Path | None = None
+    if bool(experiment_config.get("enabled", True)):
+        print("Running model comparison experiments...")
+        comparison_path = run_model_comparison_experiments(
+            frequency_train=frequency_train,
+            frequency_test=frequency_test,
+            severity_train=severity_train,
+            severity_test=severity_test,
+        )
+    else:
+        print("Model comparison experiments disabled in config.")
 
     test_predicted_claim_count = predict_claim_count(frequency_eval_model, frequency_test)
     test_predicted_severity = predict_severity(severity_eval_model, severity_test)
@@ -172,6 +187,8 @@ def main() -> None:
     print("Training complete.")
     print(f"Saved model artifacts to {Path('models').resolve()}")
     print(f"Saved evaluation metrics to {Path('results/evaluation/metrics.json').resolve()}")
+    if comparison_path is not None:
+        print(f"Saved model comparison metrics to {comparison_path.resolve()}")
     print(f"Saved premium report to {top_premiums_path.resolve()}")
     print(f"Saved experiment run summary to {experiment_path.resolve()}")
 

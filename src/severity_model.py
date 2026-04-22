@@ -1,43 +1,48 @@
 from __future__ import annotations
 
+from typing import Any
+
 import numpy as np
 import pandas as pd
-from sklearn.linear_model import GammaRegressor
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 from sklearn.pipeline import Pipeline
 
 from src.config import get_model_config
 from src.feature_engineering import MODEL_FEATURES, SEVERITY_TARGET, build_preprocessor
-
-MODEL_CONFIG = get_model_config()
+from src.model_factory import create_severity_regressor
 
 
 def train_severity_model(
     df: pd.DataFrame,
     alpha: float | None = None,
     max_iter: int | None = None,
+    model_name: str | None = None,
+    model_config: dict[str, Any] | None = None,
 ) -> Pipeline:
     """
-    Train a Gamma regression model on positive claim amounts.
+    Train a severity model on positive claim amounts.
 
-    Gamma regression requires strictly positive targets, so non-positive claim
+    Severity models require strictly positive targets, so non-positive claim
     amounts are excluded before training.
     """
     positive_claim_df = df[df[SEVERITY_TARGET] > 0].copy()
     if positive_claim_df.empty:
         raise ValueError("Severity training data is empty after filtering positive claims.")
 
-    severity_config = MODEL_CONFIG["severity"]
+    resolved_model_config = model_config.copy() if model_config is not None else get_model_config()
+    if model_name is not None:
+        resolved_model_config["severity_model"] = model_name
+
+    regressor = create_severity_regressor(
+        model_config=resolved_model_config,
+        alpha=alpha,
+        max_iter=max_iter,
+    )
+
     model = Pipeline(
         steps=[
             ("preprocessor", build_preprocessor()),
-            (
-                "regressor",
-                GammaRegressor(
-                    alpha=float(alpha if alpha is not None else severity_config["alpha"]),
-                    max_iter=int(max_iter if max_iter is not None else severity_config["max_iter"]),
-                ),
-            ),
+            ("regressor", regressor),
         ]
     )
     model.fit(positive_claim_df[MODEL_FEATURES], positive_claim_df[SEVERITY_TARGET])

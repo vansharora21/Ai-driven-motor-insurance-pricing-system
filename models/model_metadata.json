@@ -1,5 +1,5 @@
 {
-  "trained_at_utc": "2026-04-20T16:57:04.789178+00:00",
+  "trained_at_utc": "2026-04-21T18:31:51.480236+00:00",
   "random_seed": 42,
   "input_columns": [
     "IDpol",
@@ -214,14 +214,62 @@
     "evaluation": {
       "test_size": 0.2
     },
+    "experiments": {
+      "enabled": true,
+      "frequency_models": [
+        "poisson",
+        "random_forest",
+        "xgboost"
+      ],
+      "severity_models": [
+        "gamma",
+        "random_forest",
+        "xgboost"
+      ],
+      "sample_fraction": 0.2,
+      "max_frequency_rows": 30000,
+      "max_severity_rows": 30000,
+      "random_forest_n_estimators": 80,
+      "xgboost_n_estimators": 120
+    },
     "models": {
+      "frequency_model": "poisson",
+      "severity_model": "gamma",
       "frequency": {
         "alpha": 0.0001,
-        "max_iter": 1000
+        "max_iter": 1000,
+        "random_forest": {
+          "n_estimators": 300,
+          "max_depth": null,
+          "min_samples_leaf": 1,
+          "n_jobs": -1
+        },
+        "xgboost": {
+          "n_estimators": 300,
+          "learning_rate": 0.05,
+          "max_depth": 6,
+          "subsample": 0.8,
+          "colsample_bytree": 0.8,
+          "reg_lambda": 1.0
+        }
       },
       "severity": {
         "alpha": 0.0001,
-        "max_iter": 1000
+        "max_iter": 1000,
+        "random_forest": {
+          "n_estimators": 300,
+          "max_depth": null,
+          "min_samples_leaf": 1,
+          "n_jobs": -1
+        },
+        "xgboost": {
+          "n_estimators": 400,
+          "learning_rate": 0.05,
+          "max_depth": 6,
+          "subsample": 0.8,
+          "colsample_bytree": 0.8,
+          "reg_lambda": 1.0
+        }
       }
     },
     "feature_engineering": {

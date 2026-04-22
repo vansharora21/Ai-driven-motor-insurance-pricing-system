@@ -1,15 +1,16 @@
 from __future__ import annotations
 
+from typing import Any
+
 import numpy as np
 import pandas as pd
-from sklearn.linear_model import PoissonRegressor
 from sklearn.metrics import mean_poisson_deviance, mean_squared_error
 from sklearn.pipeline import Pipeline
 
 from src.config import get_feature_config, get_model_config
 from src.feature_engineering import EXPOSURE_COLUMN, FREQUENCY_TARGET, MODEL_FEATURES, build_preprocessor
+from src.model_factory import create_frequency_regressor
 
-MODEL_CONFIG = get_model_config()
 FEATURE_CONFIG = get_feature_config()
 EXPOSURE_LOWER_BOUND = float(FEATURE_CONFIG["exposure_lower_bound"])
 
@@ -18,24 +19,29 @@ def train_frequency_model(
     df: pd.DataFrame,
     alpha: float | None = None,
     max_iter: int | None = None,
+    model_name: str | None = None,
+    model_config: dict[str, Any] | None = None,
 ) -> Pipeline:
     """
-    Train a Poisson model for claim frequency per exposure unit.
+    Train a model for claim frequency per exposure unit.
 
     The target is ClaimNb / Exposure and exposure is passed as sample weight,
     matching standard actuarial frequency modeling practice.
     """
-    frequency_config = MODEL_CONFIG["frequency"]
+    resolved_model_config = model_config.copy() if model_config is not None else get_model_config()
+    if model_name is not None:
+        resolved_model_config["frequency_model"] = model_name
+
+    regressor = create_frequency_regressor(
+        model_config=resolved_model_config,
+        alpha=alpha,
+        max_iter=max_iter,
+    )
+
     model = Pipeline(
         steps=[
             ("preprocessor", build_preprocessor()),
-            (
-                "regressor",
-                PoissonRegressor(
-                    alpha=float(alpha if alpha is not None else frequency_config["alpha"]),
-                    max_iter=int(max_iter if max_iter is not None else frequency_config["max_iter"]),
-                ),
-            ),
+            ("regressor", regressor),
         ]
     )
 
