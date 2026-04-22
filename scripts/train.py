@@ -30,9 +30,12 @@ from src.model_artifacts import save_artifacts
 from src.pricing_engine import calculate_premium, compute_portfolio_baselines, compute_risk_thresholds
 from src.severity_model import evaluate_severity_model, predict_severity, train_severity_model
 from src.visualization import (
+    generate_model_comparison_visualizations,
     plot_frequency_calibration,
+    plot_predicted_vs_actual,
     plot_premium_distribution,
     plot_risk_distribution,
+    plot_error_distribution,
     plot_severity_predictions,
     save_top_premiums,
 )
@@ -134,6 +137,37 @@ def main() -> None:
 
     plot_frequency_calibration(frequency_test["ClaimNb"], test_predicted_claim_count)
     plot_severity_predictions(severity_test["ClaimAmount"], test_predicted_severity)
+
+    comparison_predictions = pd.DataFrame(
+        {
+            "ClaimAmount": severity_test["ClaimAmount"],
+            "predicted_claim_severity": test_predicted_severity,
+        }
+    )
+    if comparison_path is not None:
+        comparison_visualizations = generate_model_comparison_visualizations(
+            comparison_path,
+            comparison_predictions,
+            actual_column="ClaimAmount",
+            predicted_column="predicted_claim_severity",
+        )
+        print(
+            "Saved comparison plots to "
+            + ", ".join(str(path.resolve()) for path in comparison_visualizations.values())
+        )
+    else:
+        plot_predicted_vs_actual(
+            comparison_predictions,
+            save_path=Path("results/plots/predicted_vs_actual.png"),
+            actual_column="ClaimAmount",
+            predicted_column="predicted_claim_severity",
+        )
+        plot_error_distribution(
+            comparison_predictions,
+            save_path=Path("results/plots/error_distribution.png"),
+            actual_column="ClaimAmount",
+            predicted_column="predicted_claim_severity",
+        )
 
     print("Retraining final models on the full datasets...")
     frequency_model = train_frequency_model(policy_df)
