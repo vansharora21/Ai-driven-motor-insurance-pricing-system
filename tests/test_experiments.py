@@ -18,12 +18,15 @@ def test_run_model_comparison_generates_expected_keys(
     severity_df = engineer_features(sample_claim_df)
 
     output_path = tmp_path / "model_comparison.json"
+    comparison_csv_path = tmp_path / "model_comparison.csv"
     saved_path = run_model_comparison_experiments(
         frequency_train=frequency_df,
         frequency_test=frequency_df,
         severity_train=severity_df,
         severity_test=severity_df,
         output_path=output_path,
+        comparison_output_path=comparison_csv_path,
+        scoring_df=frequency_df,
     )
 
     assert saved_path == output_path
@@ -38,3 +41,21 @@ def test_run_model_comparison_generates_expected_keys(
         assert "status" in result
         assert "frequency_model" in result
         assert "severity_model" in result
+
+    assert comparison_csv_path.exists()
+    comparison_df = pd.read_csv(comparison_csv_path)
+    required_columns = {
+        "policy_id",
+        "glm_predicted_frequency",
+        "glm_predicted_severity",
+        "glm_premium",
+        "rf_predicted_frequency",
+        "rf_predicted_severity",
+        "rf_premium",
+        "xgb_predicted_frequency",
+        "xgb_predicted_severity",
+        "xgb_premium",
+    }
+    assert required_columns.issubset(comparison_df.columns)
+    assert len(comparison_df) == len(frequency_df)
+    assert comparison_df["policy_id"].notna().all()
