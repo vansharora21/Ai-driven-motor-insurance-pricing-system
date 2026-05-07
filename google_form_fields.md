@@ -1,62 +1,75 @@
-# Google Form Design for Motor Insurance Pricing
+# Google Form Design for Live Motor Insurance Pricing
 
-If you are collecting real driver behavior data through a Google Form, you need to ask questions that perfectly map to the expected CSV input structure of our pipeline. 
+The current Streamlit app can now read the newest CSV in the `data/` folder, map the Google Form responses into the pricing model's actuarial input schema, and show the premium proof chart directly in the UI.
 
-Here are the fields you should create in your Google Form:
+Use the following Google Form fields so the export matches the live bridge logic:
 
-### 1. Driver ID (Auto-generated or Email)
-* **Form Field:** "Email Address" or "Name (will be anonymized)"
-* **Type:** Short Answer
-* **Mapping:** `driver_id` (You can hash or replace this with 'D001', 'D002' when exporting)
+### 1. Driver Identifier
+* **Form Field:** `Driver Identifier (Email or Unique ID)`
+* **Type:** Short answer
+* **Purpose:** Traceability in the live pricing output
 
-### 2. Driver Age
-* **Form Field:** "What is your age?"
-* **Type:** Number (add validation: Must be between 18 and 100)
-* **Mapping:** `age`
+### 2. Email Address
+* **Form Field:** `Email address`
+* **Type:** Short answer
+* **Purpose:** Optional contact field for the response export
 
-### 3. Vehicle Type
-* **Form Field:** "What type of vehicle do you primarily drive?"
-* **Type:** Multiple Choice
-* **Options:** Sedan, SUV, Hatchback, Truck
-* **Mapping:** `vehicle_type`
-
-### 4. Vehicle Age
-* **Form Field:** "How old is your vehicle (in years)?"
-* **Type:** Number (add validation: Must be greater than or equal to 0)
-* **Mapping:** `vehicle_age`
-
-### 5. Daily Mileage
-* **Form Field:** "On average, how many kilometers do you drive per day?"
+### 3. Driver Age
+* **Form Field:** `Age (Must be between 18 and 100)`
 * **Type:** Number
-* **Mapping:** `daily_mileage`
+* **Purpose:** Mapped to `DrivAge`
 
-### 6. Night Driving Frequency
-* **Form Field:** "How often do you drive late at night (between 10 PM and 5 AM)?"
-* **Type:** Multiple Choice
+### 4. Vehicle Type
+* **Form Field:** `Vehicle Type`
+* **Type:** Multiple choice
+* **Options:** Sedan, SUV, Hatchback, Truck, Motorcycle, Other
+* **Purpose:** Mapped into proxy pricing inputs such as `VehPower`, `VehBrand`, and `VehGas`
+
+### 5. Vehicle Age
+* **Form Field:** `How old is your vehicle (in years)?`
+* **Type:** Number
+* **Purpose:** Mapped to `VehAge`
+
+### 6. Daily Mileage
+* **Form Field:** `On average, how many kilometers do you drive per day?`
+* **Type:** Number
+* **Purpose:** Used as a proxy signal for `Exposure` and `Density`
+
+### 7. Night Driving Frequency
+* **Form Field:** `Night Driving Frequency (10 PM – 5 AM)`
+* **Type:** Multiple choice
 * **Options:** Low (Rarely), Medium (Occasionally), High (Frequently)
-* **Mapping:** `night_driving_level` (Make sure to export just the 'Low', 'Medium', 'High' prefixes)
+* **Purpose:** Used in the proxy pricing bridge
 
-### 7. Harsh Braking Frequency
-* **Form Field:** "How often do you find yourself braking abruptly or harshly in traffic?"
-* **Type:** Multiple Choice
+### 8. Harsh Braking Frequency
+* **Form Field:** `Harsh Braking Frequency (How often do you brake abruptly in traffic?)`
+* **Type:** Multiple choice
 * **Options:** Low (Rarely), Medium (Occasionally), High (Frequently)
-* **Mapping:** `harsh_braking_level` (Make sure to export just the 'Low', 'Medium', 'High' prefixes)
+* **Purpose:** Used in the proxy pricing bridge
 
-### 8. Accident History
-* **Form Field:** "How many traffic accidents have you been involved in over the past 2 years?"
-* **Type:** Number (add validation: Must be a whole number, e.g., 0, 1, 2)
-* **Mapping:** `accidents_last_2yr`
+### 9. Accident History
+* **Form Field:** `How many traffic accidents have you been involved in during the last 2 years?`
+* **Type:** Number
+* **Purpose:** Mapped into `BonusMalus` and `Area` proxies
 
-### 9. Claim History
-* **Form Field:** "Have you filed a motor insurance claim in the last 2 years?"
-* **Type:** Multiple Choice
+### 10. Claim History
+* **Form Field:** `Have you filed a motor insurance claim in the last 2 years?`
+* **Type:** Multiple choice
 * **Options:** Yes, No
-* **Mapping:** `claim_history` (When exporting, map "No" -> 0 and "Yes" -> 1)
+* **Purpose:** Mapped into `BonusMalus` and `Area` proxies
+
+### 11. Driving Experience
+* **Form Field:** `How many years of driving experience do you have?`
+* **Type:** Number
+* **Purpose:** Used to adjust the proxy pricing bridge
 
 ---
 
-### How to use the exported data:
-1. Download the Google Form responses as a CSV.
-2. Rename the columns exactly to: `driver_id`, `age`, `vehicle_type`, `vehicle_age`, `daily_mileage`, `night_driving_level`, `harsh_braking_level`, `accidents_last_2yr`, `claim_history`.
-3. Clean the `claim_history` column to be `0` or `1`.
-4. Place it in the `data/` folder as `drivers.csv` and run the pipeline!
+### How the live scoring works
+1. Export the Google Form responses as a CSV.
+2. Place the file in the `data/` folder.
+3. Open the Streamlit app and use the `Live Google Form Data` tab.
+4. The app reads the latest CSV, maps survey answers into pricing proxies, and displays the premium waterfall chart plus the final premium output.
+
+### Important note
+The live bridge is a proxy transformation so that the form responses can be scored by the current actuarial model. It is not the same as retraining the model directly on the survey data.
