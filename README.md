@@ -1,6 +1,10 @@
 # AI-Driven Motor Insurance Pricing System
 
+[![Run Pytest Suite](https://github.com/vansharora21/Ai-driven-motor-insurance-pricing-system/actions/workflows/tests.yml/badge.svg)](https://github.com/vansharora21/Ai-driven-motor-insurance-pricing-system/actions/workflows/tests.yml)
+
 > **In One Line:** A production-grade actuarial machine learning system that predicts motor insurance premiums by separately modeling claim frequency and severity — then combining them into interpretable, risk-segmented pricing decisions.
+
+In traditional motor insurance, insurers rely on static, flat-rate demographic tables that often overcharge low-risk drivers to subsidize high-risk ones, leading to adverse selection and customer churn. This project implements a production-grade machine learning and actuarial pipeline to calculate dynamic, fair, and personalized premiums based on actual policy exposure and individual driver risk profiles. By shifting from standard static matrices to dynamic frequency-severity modeling, this system improves underwriting accuracy, protects portfolio profitability, and ensures a fairer pricing structure for policyholders.
 
 ---
 
@@ -355,6 +359,9 @@ The training pipeline (`scripts/train.py`) executes the following steps:
 
 ## 🧮 Models Used
 
+> [!NOTE]
+> For a detailed breakdown of actuarial model decisions, mathematical formulations, metric explanations (e.g. deviances vs. RMSE, Gini coefficients), and limitations, please refer to the comprehensive [MODEL_CARD.md](MODEL_CARD.md).
+
 ### Frequency Model — Poisson Regression (Default)
 
 **Purpose:** Predict the expected number of claims per policy per year.
@@ -556,7 +563,30 @@ Generates `results/premium_reports/scenario_analysis.csv` and `results/plots/sce
 streamlit run app.py
 ```
 
-Opens at `http://localhost:8501`. **Important:** Train models first (Step 3) — the app loads pre-trained artifacts and does not retrain.
+Opens at `http://localhost:8501`. **Important:** The app loads pre-trained artifacts from `models/` and does not perform live training.
+
+### 7. Deploy to Streamlit Community Cloud
+
+You can deploy the interactive scoring dashboard to **Streamlit Community Cloud** to host a live demo for hiring managers:
+
+1. **Prepare Repository:** Ensure all dependencies are specified in `requirements.txt` (including `scikit-learn`, `pandas`, `numpy`, `matplotlib`, `seaborn`, `joblib`, and `streamlit`).
+2. **Commit Trained Artifacts:** Confirm that pre-trained model files (`models/frequency_model.joblib`, `models/severity_model.joblib`, `models/model_metadata.json`, and `results/evaluation/metrics.json`) are committed to Git so the cloud container can load them immediately on startup.
+3. **Log in to Streamlit Cloud:** Go to [Streamlit Share](https://share.streamlit.io/) and log in using your GitHub account credentials.
+4. **Deploy Application:**
+   * Click **"New app"** (or **"Create app"**).
+   * Enter your repository URL: `https://github.com/vansharora21/Ai-driven-motor-insurance-pricing-system`.
+   * Set Branch to `main`.
+   * Set Main file path to `app.py`.
+   * Click **"Deploy!"**.
+5. **Brand Configuration (Optional):** You can customize the look of the web app by adding a theme configuration file at `.streamlit/config.toml`:
+   ```toml
+   [theme]
+   primaryColor = "#2563eb"
+   backgroundColor = "#ffffff"
+   secondaryBackgroundColor = "#f3f4f6"
+   textColor = "#1f2937"
+   font = "sans serif"
+   ```
 
 ---
 
