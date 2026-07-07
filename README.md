@@ -475,9 +475,15 @@ The scenario simulation module (`src/scenario_simulation.py`) performs what-if a
 ### Prerequisites
 
 - Python ≥ 3.10
-- The freMTPL2 dataset files in `data/` (see [Dataset](#-dataset) section)
 
-### 1. Installation
+### 1. Dataset Setup
+This project uses the **freMTPL2** dataset (French Motor Third-Party Liability claims).
+1. Download `freMTPL2freq.csv` and `freMTPL2sev.csv` from OpenML (dataset IDs: [41214](https://www.openml.org/d/41214) and [41215](https://www.openml.org/d/41215)) or the `CASdatasets` R package.
+2. Create a `data/` directory at the project root if it does not exist, and place both files in it:
+   - `data/freMTPL2freq.csv`
+   - `data/freMTPL2sev.csv`
+
+### 2. Installation
 
 ```bash
 git clone https://github.com/vansharora21/Ai-driven-motor-insurance-pricing-system.git
@@ -495,10 +501,15 @@ For XGBoost support (optional):
 pip install -e .[xgboost]
 ```
 
-### 2. Train the Models
+> **Note on Model Artifacts (Option B):** Pretrained models (`models/*.joblib`) are committed to the repository so that CLI predictions and the Streamlit app work immediately without requiring you to retrain them first. Run the training script to regenerate them from scratch.
 
+### 3. Train the Models
+
+> **CLI Entry Points Note:** The scripts `train.py`, `predict.py`, and `scenario_simulation.py` at the repo root are thin entry point shims; the core CLI script logic is implemented inside the `scripts/` directory.
+
+To train the models, run:
 ```bash
-python -m scripts.train
+python train.py
 ```
 
 This single command will:
@@ -523,29 +534,29 @@ Saved model artifacts to .../models
 Saved evaluation metrics to .../results/evaluation/metrics.json
 ```
 
-### 3. Run Batch Predictions (CLI)
+### 4. Run Batch Predictions (CLI)
 
 ```bash
-python -m scripts.predict --input data/freMTPL2freq.csv --output results/premium_reports/predictions.csv
+python predict.py --input data/freMTPL2freq.csv --output results/premium_reports/predictions.csv
 ```
 
 Output CSV includes: `predicted_annual_frequency`, `predicted_claim_severity`, `expected_loss`, `final_premium`, `risk_category`, and more.
 
-### 4. Run Scenario Simulation
+### 5. Run Scenario Simulation
 
 ```bash
-python -m scripts.scenario_simulation --input data/sample_batch.csv
+python scenario_simulation.py --input data/sample_batch.csv
 ```
 
 Generates `results/premium_reports/scenario_analysis.csv` and `results/plots/scenario_premium_curves.png`.
 
-### 5. Launch the Streamlit App
+### 6. Launch the Streamlit App
 
 ```bash
 streamlit run app.py
 ```
 
-Opens at `http://localhost:8501`. **Important:** Train models first (Step 2) — the app loads pre-trained artifacts and does not retrain.
+Opens at `http://localhost:8501`. **Important:** Train models first (Step 3) — the app loads pre-trained artifacts and does not retrain.
 
 ---
 
