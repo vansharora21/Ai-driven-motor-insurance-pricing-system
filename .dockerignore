@@ -1,0 +1,12 @@
+__pycache__
+.pytest_cache
+.git
+.github
+.gitignore
+.ipynb_checkpoints
+logs
+models/*.joblib
+results
+*.pyc
+.env
+*.md

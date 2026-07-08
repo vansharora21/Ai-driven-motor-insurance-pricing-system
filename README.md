@@ -1,6 +1,6 @@
 # AI-Driven Motor Insurance Pricing System
 
-[![Run Pytest Suite](https://github.com/vansharora21/Ai-driven-motor-insurance-pricing-system/actions/workflows/tests.yml/badge.svg)](https://github.com/vansharora21/Ai-driven-motor-insurance-pricing-system/actions/workflows/tests.yml)
+[![CI](https://github.com/vansharora21/Ai-driven-motor-insurance-pricing-system/actions/workflows/ci.yml/badge.svg)](https://github.com/vansharora21/Ai-driven-motor-insurance-pricing-system/actions/workflows/ci.yml)
 
 > **In One Line:** A production-grade actuarial machine learning system that predicts motor insurance premiums by separately modeling claim frequency and severity — then combining them into interpretable, risk-segmented pricing decisions.
 
@@ -136,6 +136,26 @@ Both receive fair, personalized pricing based on their actual risk profile — n
 - Experiment tracking with dataset versioning (SHA-256 hashes)
 - Global random seed for full reproducibility
 
+### REST API (FastAPI)
+- Production-grade REST API with `/api/v1/predict` and `/api/v1/predict/csv` endpoints
+- Pydantic request/response models with automatic OpenAPI docs
+- Health check endpoint for monitoring
+- CORS-enabled, ready for frontend integration
+
+### Docker Containerization
+- Multi-service Docker Compose setup (train, API, Streamlit)
+- Reproducible environment with pinned dependencies
+- One-command startup for the full stack
+
+### Code Quality Tooling
+- **Logging** — structured logging (file + stdout) replaces all `print()` calls
+- **CI/CD** — GitHub Actions workflow: lint (ruff + mypy), test (3 Python versions), Docker build
+- **Pre-commit hooks** — ruff, mypy, trailing whitespace, YAML validation, secrets detection
+
+### Shared Model Abstraction
+- `BaseActuarialModel` abstract class eliminates duplication between frequency and severity models
+- Consistent `fit`/`predict`/`evaluate` interface reduces bugs and improves maintainability
+
 ---
 
 ## 🏗️ System Architecture
@@ -212,12 +232,14 @@ Raw Data (freMTPL2freq.csv + freMTPL2sev.csv)
 ├── scripts/
 │   ├── train.py                    # Main training + evaluation + experiment script
 │   ├── predict.py                  # CLI batch prediction script
-│   └── scenario_simulation.py      # CLI scenario analysis script
+│   ├── scenario_simulation.py      # CLI scenario analysis script
+│   └── serve.py                    # FastAPI server entry point
 │
 ├── src/                            # Core library modules
 │   ├── config.py                   # Configuration loading and global determinism
 │   ├── data_loader.py              # Data loading, validation, and cleaning
 │   ├── feature_engineering.py      # Feature preprocessing pipeline
+│   ├── base_model.py               # Abstract base class for frequency/severity models
 │   ├── frequency_model.py          # Frequency model training and evaluation
 │   ├── severity_model.py           # Severity model training and evaluation
 │   ├── model_factory.py            # Configurable model creation (Poisson/Gamma/RF/XGB)
@@ -226,7 +248,9 @@ Raw Data (freMTPL2freq.csv + freMTPL2sev.csv)
 │   ├── experiment_tracking.py      # Experiment run persistence and dataset versioning
 │   ├── scenario_simulation.py      # What-if scenario simulation engine
 │   ├── visualization.py            # Plot generation (calibration, comparison, importance)
-│   └── model_artifacts.py          # Model and metadata persistence
+│   ├── model_artifacts.py          # Model and metadata persistence
+│   ├── api.py                      # FastAPI REST API router
+│   └── logger.py                   # Centralized logging configuration
 │
 ├── data/
 │   ├── freMTPL2freq.csv            # Frequency data (~678K policies)
@@ -565,7 +589,74 @@ streamlit run app.py
 
 Opens at `http://localhost:8501`. **Important:** The app loads pre-trained artifacts from `models/` and does not perform live training.
 
-### 7. Deploy to Streamlit Community Cloud
+### 7. Run the REST API (FastAPI)
+
+```bash
+# Start the API server
+python -m scripts.serve
+
+# Or with hot-reload for development
+uvicorn scripts.serve:app --reload --port 8000
+```
+
+The API is available at `http://localhost:8000` with interactive Swagger docs at `http://localhost:8000/docs`.
+
+**Example API request:**
+
+```bash
+curl -X POST http://localhost:8000/api/v1/predict \
+  -H "Content-Type: application/json" \
+  -d '[{"Exposure":1.0,"VehPower":6,"VehAge":5,"DrivAge":40,"BonusMalus":60,"VehBrand":"B12","VehGas":"Regular","Area":"C","Density":500,"Region":"Centre"}]'
+```
+
+**Example response:**
+
+```json
+[
+  {
+    "predicted_annual_frequency": 0.12,
+    "predicted_claim_count": 0.12,
+    "predicted_claim_severity": 2100.0,
+    "annualized_expected_loss": 252.0,
+    "expected_loss": 252.0,
+    "pure_premium": 252.0,
+    "technical_premium": 377.6,
+    "final_premium": 377.6,
+    "risk_score": 95.0,
+    "risk_category": "Medium",
+    "frequency_relativity": 0.89,
+    "severity_relativity": 1.05
+  }
+]
+```
+
+### 8. Run Everything with Docker
+
+```bash
+# Train models
+docker compose run --rm train
+
+# Start the API server
+docker compose up api
+
+# Start the Streamlit app
+docker compose up streamlit
+```
+
+### 9. Code Quality & Pre-commit
+
+```bash
+# Install pre-commit hooks
+pip install pre-commit && pre-commit install
+
+# Run linter manually
+ruff check src/ scripts/ tests/
+
+# Run type checker
+mypy src/ --ignore-missing-imports
+```
+
+### 10. Deploy to Streamlit Community Cloud
 
 You can deploy the interactive scoring dashboard to **Streamlit Community Cloud** to host a live demo for hiring managers:
 
@@ -699,9 +790,9 @@ All tests validate behavior using synthetic fixtures — no retraining or datase
 - **Uncertainty Quantification** — confidence intervals around frequency and severity predictions
 - **Drift Detection** — monitor model performance on new data and alert when retraining is needed
 - **Fairness Analysis** — audit pricing across demographics for non-discriminatory underwriting
-- **API Service** — package as a FastAPI microservice for enterprise deployment
 - **SHAP Explainability** — add SHAP value analysis alongside feature importance
 - **Calibration Diagnostics** — enhanced residual analysis and population stability indices
+- **Async Batch Processing** — job queue for large CSV uploads via the REST API
 
 ---
 

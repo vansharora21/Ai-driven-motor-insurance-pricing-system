@@ -15,6 +15,9 @@ import seaborn as sns
 from sklearn.pipeline import Pipeline
 
 from src.config import get_random_seed
+from src.logger import get_logger
+
+logger = get_logger(__name__)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 PLOTS_DIR = PROJECT_ROOT / "results" / "plots"
@@ -195,9 +198,9 @@ def plot_feature_importance(
 
     if print_top_n:
         top_preview = top_features.head(min(top_n, len(top_features))).copy()
-        print(f"Top {len(top_preview)} features for {resolved_label} ({regressor_name}):")
+        logger.info("Top %d features for %s (%s):", len(top_preview), resolved_label, regressor_name)
         for _, row in top_preview.iterrows():
-            print(f"  {row['feature']}: {row['importance']:.6f}")
+            logger.info("  %s: %.6f", row["feature"], row["importance"])
 
     return output_path
 

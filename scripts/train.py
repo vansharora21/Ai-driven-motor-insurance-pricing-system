@@ -17,6 +17,9 @@ from src.config import (
 from src.data_loader import prepare_model_datasets
 from src.experiments import run_model_comparison_experiments
 from src.experiment_tracking import persist_experiment_run
+from src.logger import get_logger
+
+logger = get_logger(__name__)
 from src.feature_engineering import (
     CATEGORICAL_FEATURES,
     EXPOSURE_COLUMN,
@@ -96,10 +99,10 @@ def main() -> None:
     experiment_config = get_experiment_config(modeling_config)
     pricing_config = get_pricing_config(modeling_config)
 
-    print("Loading and preparing freMTPL2 datasets...")
+    logger.info("Loading and preparing freMTPL2 datasets...")
     policy_df, severity_df, data_quality = prepare_model_datasets()
 
-    print("Splitting frequency and severity training sets...")
+    logger.info("Splitting frequency and severity training sets...")
     # Frequency model uses policy-level claim counts, stratified by claim occurrence.
     frequency_train, frequency_test = train_test_split(
         policy_df,
@@ -114,17 +117,17 @@ def main() -> None:
         random_state=random_seed,
     )
 
-    print("Training evaluation models...")
+    logger.info("Training evaluation models...")
     frequency_eval_model = train_frequency_model(frequency_train)
     severity_eval_model = train_severity_model(severity_train)
 
-    print("Evaluating holdout performance...")
+    logger.info("Evaluating holdout performance...")
     frequency_metrics = evaluate_frequency_model(frequency_eval_model, frequency_test)
     severity_metrics = evaluate_severity_model(severity_eval_model, severity_test)
 
     comparison_path: Path | None = None
     if bool(experiment_config.get("enabled", True)):
-        print("Running model comparison experiments...")
+        logger.info("Running model comparison experiments...")
         comparison_path = run_model_comparison_experiments(
             frequency_train=frequency_train,
             frequency_test=frequency_test,
@@ -132,7 +135,7 @@ def main() -> None:
             severity_test=severity_test,
         )
     else:
-        print("Model comparison experiments disabled in config.")
+        logger.info("Model comparison experiments disabled in config.")
 
     test_predicted_claim_count = predict_claim_count(frequency_eval_model, frequency_test)
     test_predicted_severity = predict_severity(severity_eval_model, severity_test)
@@ -153,9 +156,9 @@ def main() -> None:
             actual_column="ClaimAmount",
             predicted_column="predicted_claim_severity",
         )
-        print(
-            "Saved comparison plots to "
-            + ", ".join(str(path.resolve()) for path in comparison_visualizations.values())
+        logger.info(
+            "Saved comparison plots to %s",
+            ", ".join(str(path.resolve()) for path in comparison_visualizations.values()),
         )
     else:
         plot_predicted_vs_actual(
@@ -171,7 +174,7 @@ def main() -> None:
             predicted_column="predicted_claim_severity",
         )
 
-    print("Retraining final models on the full datasets...")
+    logger.info("Retraining final models on the full datasets...")
     frequency_model = train_frequency_model(policy_df)
     severity_model = train_severity_model(severity_df)
 
@@ -188,12 +191,12 @@ def main() -> None:
             model_label=f"frequency_{frequency_model_name}",
         )
         if frequency_importance_path is not None:
-            print(f"Saved frequency feature importance plot to {frequency_importance_path.resolve()}")
-            print("Top 10 frequency features:")
+            logger.info("Saved frequency feature importance plot to %s", frequency_importance_path.resolve())
+            logger.info("Top 10 frequency features:")
             for _, row in frequency_importance.head(10).iterrows():
-                print(f"  {row['feature']}: {row['importance']:.6f}")
+                logger.info("  %s: %.6f", row["feature"], row["importance"])
     else:
-        print(f"Skipped frequency feature importance for {frequency_model_name} (unsupported regressor).")
+        logger.warning("Skipped frequency feature importance for %s (unsupported regressor).", frequency_model_name)
 
     if severity_importance is not None:
         severity_importance_path = plot_feature_importance(
@@ -202,12 +205,12 @@ def main() -> None:
             model_label=f"severity_{severity_model_name}",
         )
         if severity_importance_path is not None:
-            print(f"Saved severity feature importance plot to {severity_importance_path.resolve()}")
-            print("Top 10 severity features:")
+            logger.info("Saved severity feature importance plot to %s", severity_importance_path.resolve())
+            logger.info("Top 10 severity features:")
             for _, row in severity_importance.head(10).iterrows():
-                print(f"  {row['feature']}: {row['importance']:.6f}")
+                logger.info("  %s: %.6f", row["feature"], row["importance"])
     else:
-        print(f"Skipped severity feature importance for {severity_model_name} (unsupported regressor).")
+        logger.warning("Skipped severity feature importance for %s (unsupported regressor).", severity_model_name)
 
     # Portfolio baselines stabilize relativities and risk scores across prediction batches.
     portfolio_frequency = predict_frequency(frequency_model, policy_df)
@@ -260,13 +263,13 @@ def main() -> None:
         data_quality=data_quality,
     )
 
-    print("Training complete.")
-    print(f"Saved model artifacts to {Path('models').resolve()}")
-    print(f"Saved evaluation metrics to {Path('results/evaluation/metrics.json').resolve()}")
+    logger.info("Training complete.")
+    logger.info("Saved model artifacts to %s", Path("models").resolve())
+    logger.info("Saved evaluation metrics to %s", Path("results/evaluation/metrics.json").resolve())
     if comparison_path is not None:
-        print(f"Saved model comparison metrics to {comparison_path.resolve()}")
-    print(f"Saved premium report to {top_premiums_path.resolve()}")
-    print(f"Saved experiment run summary to {experiment_path.resolve()}")
+        logger.info("Saved model comparison metrics to %s", comparison_path.resolve())
+    logger.info("Saved premium report to %s", top_premiums_path.resolve())
+    logger.info("Saved experiment run summary to %s", experiment_path.resolve())
 
 
 if __name__ == "__main__":

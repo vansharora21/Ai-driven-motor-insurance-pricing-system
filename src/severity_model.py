@@ -4,12 +4,58 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
-from sklearn.metrics import mean_absolute_error, mean_gamma_deviance, mean_squared_error
-from sklearn.pipeline import Pipeline
+from sklearn.metrics import mean_absolute_error, mean_gamma_deviance
 
+from src.base_model import BaseActuarialModel
 from src.config import get_model_config
-from src.feature_engineering import MODEL_FEATURES, SEVERITY_TARGET, build_preprocessor
+from src.feature_engineering import MODEL_FEATURES, SEVERITY_TARGET
 from src.model_factory import create_severity_regressor
+
+
+class SeverityModel(BaseActuarialModel):
+    target_column = SEVERITY_TARGET
+
+    def _set_model_name(self, name: str) -> None:
+        self.model_config["severity_model"] = name
+
+    def _create_regressor(self) -> Any:
+        return create_severity_regressor(
+            model_config=self.model_config,
+            alpha=self.alpha,
+            max_iter=self.max_iter,
+        )
+
+    def fit(self, df: pd.DataFrame) -> Any:
+        positive_df = df[df[SEVERITY_TARGET] > 0].copy()
+        if positive_df.empty:
+            raise ValueError(
+                "Severity training data is empty after filtering positive claims."
+            )
+        self._pipeline = self.build_pipeline()
+        self._pipeline.fit(
+            positive_df[MODEL_FEATURES],
+            positive_df[SEVERITY_TARGET],
+        )
+        return self._pipeline
+
+    def evaluate(self, df: pd.DataFrame) -> dict[str, Any]:
+        positive_df = df[df[SEVERITY_TARGET] > 0].copy()
+        if positive_df.empty:
+            raise ValueError(
+                "Severity evaluation data is empty after filtering positive claims."
+            )
+        return super().evaluate(positive_df)
+
+    def _extra_metrics(
+        self, y_true: pd.Series, y_pred: pd.Series
+    ) -> dict[str, float]:
+        return {
+            "mae": float(mean_absolute_error(y_true, y_pred)),
+            "gamma_deviance": float(mean_gamma_deviance(y_true, y_pred)),
+        }
+
+    def _prediction_name(self) -> str:
+        return "predicted_claim_severity"
 
 
 def train_severity_model(
@@ -18,69 +64,29 @@ def train_severity_model(
     max_iter: int | None = None,
     model_name: str | None = None,
     model_config: dict[str, Any] | None = None,
-) -> Pipeline:
-    """
-    Train a severity model on positive claim amounts.
-
-    Severity models require strictly positive targets, so non-positive claim
-    amounts are excluded before training.
-    """
-    positive_claim_df = df[df[SEVERITY_TARGET] > 0].copy()
-    if positive_claim_df.empty:
-        raise ValueError("Severity training data is empty after filtering positive claims.")
-
-    resolved_model_config = model_config.copy() if model_config is not None else get_model_config()
-    if model_name is not None:
-        resolved_model_config["severity_model"] = model_name
-
-    regressor = create_severity_regressor(
-        model_config=resolved_model_config,
+) -> Any:
+    resolved_config = (
+        model_config.copy() if model_config is not None else get_model_config()
+    )
+    model = SeverityModel(
+        model_config=resolved_config,
+        model_name=model_name,
         alpha=alpha,
         max_iter=max_iter,
     )
-
-    model = Pipeline(
-        steps=[
-            ("preprocessor", build_preprocessor()),
-            ("regressor", regressor),
-        ]
-    )
-    model.fit(positive_claim_df[MODEL_FEATURES], positive_claim_df[SEVERITY_TARGET])
-    return model
+    return model.fit(df)
 
 
-def predict_severity(model: Pipeline, df: pd.DataFrame) -> pd.Series:
-    """Predict expected claim severity for each row in the input dataframe."""
-    predicted_severity = model.predict(df[MODEL_FEATURES])
-    predicted_severity = np.clip(predicted_severity, 1e-9, None)
-    return pd.Series(predicted_severity, index=df.index, name="predicted_claim_severity")
+def predict_severity(model: Any, df: pd.DataFrame) -> pd.Series:
+    base_model = model if isinstance(model, SeverityModel) else SeverityModel()
+    base_model._pipeline = model if hasattr(model, "predict") else model
+    return base_model.predict(df)
 
 
-def evaluate_severity_model(model: Pipeline, df: pd.DataFrame) -> dict[str, Any]:
-    """Evaluate holdout severity performance using MAE, RMSE, and Gamma deviance."""
-    regressor_name = model.named_steps["regressor"].__class__.__name__
-    positive_eval_df = df[df[SEVERITY_TARGET] > 0].copy()
-    if positive_eval_df.empty:
-        raise ValueError("Severity evaluation data is empty after filtering positive claims.")
-
-    observed_severity = positive_eval_df[SEVERITY_TARGET].astype(float)
-    predicted_severity = predict_severity(model, positive_eval_df)
-
-    mae = float(mean_absolute_error(observed_severity, predicted_severity))
-    rmse = float(np.sqrt(mean_squared_error(observed_severity, predicted_severity)))
-    gamma_deviance = float(mean_gamma_deviance(observed_severity, predicted_severity))
-
-    return {
-        "model_name": regressor_name,
-        "evaluation_split": "test",
-        "sample_size": int(len(positive_eval_df)),
-        "metrics": {
-            "rmse": rmse,
-            "mae": mae,
-            "gamma_deviance": gamma_deviance,
-        },
-        "distribution": {
-            "observed_mean": float(observed_severity.mean()),
-            "predicted_mean": float(predicted_severity.mean()),
-        },
-    }
+def evaluate_severity_model(
+    model: Any, df: pd.DataFrame
+) -> dict[str, Any]:
+    base_model = model if isinstance(model, SeverityModel) else SeverityModel()
+    if hasattr(model, "predict"):
+        base_model._pipeline = model
+    return base_model.evaluate(df)

@@ -12,10 +12,13 @@ import pandas as pd
 from src.config import get_experiment_config, get_model_config, get_pricing_config, get_random_seed
 from src.feature_engineering import POLICY_ID_COLUMN
 from src.frequency_model import evaluate_frequency_model, predict_frequency, train_frequency_model
+from src.logger import get_logger
 from src.model_artifacts import EVALUATION_DIR, PLOTS_DIR, REPORTS_DIR
 from src.pricing_engine import calculate_premium
 from src.severity_model import evaluate_severity_model, predict_severity, train_severity_model
 from src.visualization import plot_feature_importance
+
+logger = get_logger(__name__)
 
 FREQUENCY_EXPERIMENT_MODELS = ["poisson", "random_forest", "xgboost"]
 SEVERITY_EXPERIMENT_MODELS = ["gamma", "random_forest", "xgboost"]
@@ -121,10 +124,12 @@ def run_model_comparison_experiments(
         random_seed=random_seed,
     )
 
-    print(
-        "Model comparison sample sizes: "
-        f"frequency_train={len(experiment_frequency_train)}/{len(frequency_train)}, "
-        f"severity_train={len(experiment_severity_train)}/{len(severity_train)}"
+    logger.info(
+        "Model comparison sample sizes: frequency_train=%d/%d, severity_train=%d/%d",
+        len(experiment_frequency_train),
+        len(frequency_train),
+        len(experiment_severity_train),
+        len(severity_train),
     )
 
     scoring_frame = scoring_df.copy() if scoring_df is not None else frequency_test.copy()
@@ -163,14 +168,14 @@ def run_model_comparison_experiments(
         )
         if saved_path is not None:
             generated_feature_importance_labels.add(feature_importance_label)
-            print(f"Saved feature importance plot to {saved_path.resolve()}")
+            logger.info("Saved feature importance plot to %s", saved_path.resolve())
 
     for run_index, (frequency_model_name, severity_model_name) in enumerate(
         product(frequency_models, severity_models),
         start=1,
     ):
         run_label = f"[{run_index}/{total_runs}] {frequency_model_name} + {severity_model_name}"
-        print(f"Model comparison run {run_label}: training...")
+        logger.info("Model comparison run %s: training...", run_label)
         started_at = perf_counter()
         key = _experiment_key(frequency_model_name, severity_model_name)
 
@@ -217,7 +222,7 @@ def run_model_comparison_experiments(
                     "severity": severity_metrics,
                 },
             }
-            print(f"Model comparison run {run_label}: success in {elapsed_seconds:.2f}s")
+            logger.info("Model comparison run %s: success in %.2fs", run_label, elapsed_seconds)
         except ImportError as exc:
             elapsed_seconds = float(perf_counter() - started_at)
             comparison_results[key] = {
@@ -227,7 +232,7 @@ def run_model_comparison_experiments(
                 "duration_seconds": elapsed_seconds,
                 "error": str(exc),
             }
-            print(f"Model comparison run {run_label}: skipped ({exc})")
+            logger.warning("Model comparison run %s: skipped (%s)", run_label, exc)
         except Exception as exc:  # pragma: no cover - defensive logging path
             elapsed_seconds = float(perf_counter() - started_at)
             comparison_results[key] = {
@@ -237,7 +242,7 @@ def run_model_comparison_experiments(
                 "duration_seconds": elapsed_seconds,
                 "error": str(exc),
             }
-            print(f"Model comparison run {run_label}: failed ({exc})")
+            logger.error("Model comparison run %s: failed (%s)", run_label, exc)
 
     with resolved_output_path.open("w", encoding="utf-8") as comparison_file:
         json.dump(comparison_results, comparison_file, indent=2)
@@ -254,6 +259,6 @@ def run_model_comparison_experiments(
 
     premium_comparison_df = premium_comparison_df[ordered_columns]
     premium_comparison_df.to_csv(resolved_comparison_output_path, index=False, float_format="%.6f")
-    print(f"Saved premium model comparison report to {resolved_comparison_output_path.resolve()}")
+    logger.info("Saved premium model comparison report to %s", resolved_comparison_output_path.resolve())
 
     return resolved_output_path
