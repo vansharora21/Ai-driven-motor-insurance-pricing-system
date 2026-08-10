@@ -12,8 +12,11 @@ RUN pip install --no-cache-dir --upgrade pip && \
 
 COPY . .
 
+# Trained artifacts are committed to the repo; the API only needs to load them.
 RUN mkdir -p models results/logs
 
-EXPOSE 8000 8501
+EXPOSE 8000
 
-CMD ["python", "-m", "scripts.train"]
+# Serve the FastAPI inference backend. Training/retraining is a separate,
+# explicit step (scripts/train.py / scripts/retrain.py) — never run at boot.
+CMD ["uvicorn", "api:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -165,13 +165,18 @@ create index if not exists idx_b2b_created_at on public.b2b_portfolios (created_
 
 
 def _policy_payload(policy: dict[str, Any]) -> dict[str, Any]:
-    """Extract only the anonymized policy attributes we are allowed to store."""
-    return {column: policy.get(column) for column in POLICY_COLUMNS}
+    """Extract only the anonymized policy attributes we are allowed to store.
+
+    Postgres folds unquoted identifiers to lowercase, so Supabase tables store
+    these columns as lowercase (area, exposure, ...). We send lowercase keys
+    to match the actual schema.
+    """
+    return {column.lower(): policy.get(column) for column in POLICY_COLUMNS}
 
 
 def _result_payload(result: dict[str, Any]) -> dict[str, Any]:
     """Extract the scored outputs we persist alongside the policy."""
-    return {column: result.get(column) for column in RESULT_COLUMNS}
+    return {column.lower(): result.get(column) for column in RESULT_COLUMNS}
 
 
 def save_quote(
