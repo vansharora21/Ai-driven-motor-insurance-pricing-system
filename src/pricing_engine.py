@@ -92,13 +92,20 @@ def calculate_premium(
     if pricing_config:
         pricing.update(pricing_config)
 
+    # Models are trained on EUR data; convert monetary outputs to INR for the
+    # Indian market. Frequency is unitless (claims/year) and stays unchanged.
+    fx_rate = float(pricing.get("fx_rate_to_inr", 1.0))
+
     scored_df = df.copy()
     exposure_values = pd.to_numeric(scored_df[EXPOSURE_COLUMN], errors="coerce").fillna(1.0).clip(lower=EXPOSURE_LOWER_BOUND)
     annual_frequency_series = pd.Series(annual_frequency, index=scored_df.index, copy=False).astype(float).clip(lower=0.0)
-    expected_severity_series = pd.Series(expected_severity, index=scored_df.index, copy=False).astype(float).clip(lower=0.0)
+    expected_severity_series = pd.Series(expected_severity, index=scored_df.index, copy=False).astype(float).clip(lower=0.0) * fx_rate
 
     resolved_baselines = (
-        {key: float(value) for key, value in portfolio_baselines.items()}
+        {
+            key: float(value) * (fx_rate if key in ("claim_severity", "annualized_expected_loss") else 1.0)
+            for key, value in portfolio_baselines.items()
+        }
         if portfolio_baselines
         else compute_portfolio_baselines(annual_frequency_series, expected_severity_series, pricing)
     )
