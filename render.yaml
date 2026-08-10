@@ -22,5 +22,5 @@ services:
       # The API degrades gracefully when they are absent (no quote saving).
       - key: SUPABASE_URL
         sync: false
-      - key: SUPABASE_SERVICE_ROLE_KEY
+      - key: SUPABASE_SECRET_KEY
         sync: false

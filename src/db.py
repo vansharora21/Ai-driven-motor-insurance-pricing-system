@@ -29,7 +29,11 @@ logger = logging.getLogger("motor-pricing-db")
 # ---------------------------------------------------------------------------
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "").strip().rstrip("/")
-SUPABASE_SERVICE_ROLE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "").strip()
+# New-style Supabase projects expose SUPABASE_SECRET_KEY (server-side, full
+# access). Older projects used SUPABASE_SERVICE_ROLE_KEY. Support both.
+SUPABASE_SECRET_KEY = os.environ.get("SUPABASE_SECRET_KEY", "").strip() or os.environ.get(
+    "SUPABASE_SERVICE_ROLE_KEY", ""
+).strip()
 
 # Column names shared by the quotes / training_data tables.
 POLICY_COLUMNS = [
@@ -65,7 +69,7 @@ _client: Any | None = None
 
 def is_configured() -> bool:
     """True when both Supabase env vars are present."""
-    return bool(SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY)
+    return bool(SUPABASE_URL and SUPABASE_SECRET_KEY)
 
 
 def get_client() -> Any:
@@ -74,12 +78,12 @@ def get_client() -> Any:
     if _client is None:
         if not is_configured():
             raise RuntimeError(
-                "Supabase is not configured. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY."
+                "Supabase is not configured. Set SUPABASE_URL and SUPABASE_SECRET_KEY."
             )
         try:
             from supabase import create_client
 
-            _client = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+            _client = create_client(SUPABASE_URL, SUPABASE_SECRET_KEY)
         except ImportError as exc:  # pragma: no cover - env-dependent
             raise RuntimeError(
                 "supabase-py is not installed. Run `pip install -r requirements.txt`."
