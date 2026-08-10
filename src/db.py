@@ -203,7 +203,11 @@ def save_quote(
 
 
 def save_b2b_portfolio(rows: list[dict[str, Any]], portfolio_name: str = "untitled") -> int:
-    """Bulk-insert an insurer portfolio. Returns number of rows inserted."""
+    """Bulk-insert an insurer portfolio. Returns number of rows inserted.
+
+    Inserts are chunked (500 rows per request) to stay under Supabase's
+    statement timeout for large portfolios.
+    """
     if not is_configured() or not rows:
         return 0
     try:
@@ -215,8 +219,13 @@ def save_b2b_portfolio(rows: list[dict[str, Any]], portfolio_name: str = "untitl
              "premium_paid": row.get("premium_paid")}
             for row in rows
         ]
-        client.table("b2b_portfolios").insert(payload).execute()
-        return len(payload)
+        inserted = 0
+        chunk_size = 500
+        for start in range(0, len(payload), chunk_size):
+            chunk = payload[start : start + chunk_size]
+            client.table("b2b_portfolios").insert(chunk).execute()
+            inserted += len(chunk)
+        return inserted
     except Exception:
         logger.exception("Failed to save B2B portfolio to Supabase")
         return 0
@@ -225,6 +234,27 @@ def save_b2b_portfolio(rows: list[dict[str, Any]], portfolio_name: str = "untitl
 # ---------------------------------------------------------------------------
 # Read helpers (for retraining / drift)
 # ---------------------------------------------------------------------------
+
+
+def _fetch_all_rows(client: Any, table: str) -> list[dict[str, Any]]:
+    """Fetch every row from a table, paginating past Supabase's 1000-row cap."""
+    page_size = 1000
+    offset = 0
+    rows: list[dict[str, Any]] = []
+    while True:
+        response = (
+            client.table(table)
+            .select("*")
+            .order("created_at")
+            .range(offset, offset + page_size - 1)
+            .execute()
+        )
+        batch = response.data or []
+        rows.extend(batch)
+        if len(batch) < page_size:
+            break
+        offset += page_size
+    return rows
 
 
 def fetch_training_data() -> dict[str, list[dict[str, Any]]]:
@@ -236,11 +266,11 @@ def fetch_training_data() -> dict[str, list[dict[str, Any]]]:
     if not is_configured():
         raise RuntimeError("Supabase is not configured.")
     client = get_client()
-    training = client.table("training_data").select("*").order("created_at").execute()
-    b2b = client.table("b2b_portfolios").select("*").order("created_at").execute()
+    training = _fetch_all_rows(client, "training_data")
+    b2b = _fetch_all_rows(client, "b2b_portfolios")
     return {
-        "training_data": training.data or [],
-        "b2b_portfolios": b2b.data or [],
+        "training_data": training,
+        "b2b_portfolios": b2b,
     }
 
 

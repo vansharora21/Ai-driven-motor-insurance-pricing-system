@@ -36,8 +36,8 @@ results/experiments/
 logs/
 
 # Local datasets and generated data files
-data/freMTPL2freq.csv
-data/freMTPL2sev.csv
+# NOTE: freMTPL2freq.csv / freMTPL2sev.csv are intentionally TRACKED —
+# scripts/retrain.py requires them as the bundled baseline.
 data/sample_batch.csv
 data/freMTPL2_batch_template.csv
 data/freMTPL2_bootstrap_sample.csv

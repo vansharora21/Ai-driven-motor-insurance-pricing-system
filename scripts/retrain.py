@@ -17,17 +17,47 @@ from __future__ import annotations
 
 import argparse
 import sys
+from pathlib import Path
 
-import numpy as np
 import pandas as pd
 
+from src.data_loader import prepare_model_datasets
 from src.db import fetch_training_data
-from src.feature_engineering import INPUT_COLUMNS, POLICY_ID_COLUMN
+from src.feature_engineering import POLICY_ID_COLUMN, engineer_features
 from scripts.train import run_training_pipeline
 
 # Minimum number of policy rows before a retrain is allowed. Retraining on a
 # handful of quotes would overfit and silently degrade the production model.
 DEFAULT_MIN_ROWS = 200
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+FREQUENCY_PATH = PROJECT_ROOT / "data" / "freMTPL2freq.csv"
+SEVERITY_PATH = PROJECT_ROOT / "data" / "freMTPL2sev.csv"
+
+
+def _get(record: dict, key: str):
+    """Case-insensitive lookup for Supabase records.
+
+    Postgres folds unquoted identifiers to lowercase, so Supabase returns
+    lowercase keys (exposure, vehpower, ...) while the rest of the codebase
+    uses the canonical capitalized names (Exposure, VehPower, ...).
+    """
+    if key in record:
+        return record[key]
+    lowered = key.lower()
+    for record_key, value in record.items():
+        if record_key.lower() == lowered:
+            return value
+    return None
+
+
+def _policy_id(record: dict, fallback: int) -> int:
+    """Supabase ids are UUIDs; the pipeline needs a unique integer policy id."""
+    raw = _get(record, "id")
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return fallback
 
 
 def _build_policy_frame(records: list[dict]) -> pd.DataFrame:
@@ -38,23 +68,23 @@ def _build_policy_frame(records: list[dict]) -> pd.DataFrame:
     calibration work but is not a model feature.
     """
     rows = []
-    for record in records:
-        claim_occurred = bool(record.get("claim_occurred")) or float(record.get("claim_amount") or 0) > 0
+    for index, record in enumerate(records):
+        claim_occurred = bool(_get(record, "claim_occurred")) or float(_get(record, "claim_amount") or 0) > 0
         rows.append(
             {
-                POLICY_ID_COLUMN: int(record.get("id", 0)) if isinstance(record.get("id"), int) else 0,
+                POLICY_ID_COLUMN: _policy_id(record, index + 1),
                 "ClaimNb": int(claim_occurred),
-                "Exposure": float(record.get("Exposure") or 1.0),
-                "VehPower": float(record.get("VehPower") or 6.0),
-                "VehAge": float(record.get("VehAge") or 6.0),
-                "DrivAge": float(record.get("DrivAge") or 40.0),
-                "BonusMalus": float(record.get("BonusMalus") or 60.0),
-                "VehBrand": str(record.get("VehBrand") or "B12"),
-                "VehGas": str(record.get("VehGas") or "Regular"),
-                "Area": str(record.get("Area") or "C"),
-                "Density": float(record.get("Density") or 500.0),
-                "Region": str(record.get("Region") or "Centre"),
-                "premium_paid": float(record.get("premium_paid") or 0.0),
+                "Exposure": float(_get(record, "Exposure") or 1.0),
+                "VehPower": float(_get(record, "VehPower") or 6.0),
+                "VehAge": float(_get(record, "VehAge") or 6.0),
+                "DrivAge": float(_get(record, "DrivAge") or 40.0),
+                "BonusMalus": float(_get(record, "BonusMalus") or 60.0),
+                "VehBrand": str(_get(record, "VehBrand") or "B12"),
+                "VehGas": str(_get(record, "VehGas") or "Regular"),
+                "Area": str(_get(record, "Area") or "C"),
+                "Density": float(_get(record, "Density") or 500.0),
+                "Region": str(_get(record, "Region") or "Centre"),
+                "premium_paid": float(_get(record, "premium_paid") or 0.0),
             }
         )
     return pd.DataFrame(rows)
@@ -66,24 +96,24 @@ def _build_severity_frame(records: list[dict]) -> pd.DataFrame:
     Only records with an actual paid claim amount produce a severity row.
     """
     rows = []
-    for record in records:
-        claim_amount = float(record.get("claim_amount") or 0.0)
+    for index, record in enumerate(records):
+        claim_amount = float(_get(record, "claim_amount") or 0.0)
         if claim_amount <= 0:
             continue
         rows.append(
             {
-                POLICY_ID_COLUMN: int(record.get("id", 0)) if isinstance(record.get("id"), int) else 0,
+                POLICY_ID_COLUMN: _policy_id(record, index + 1),
                 "ClaimAmount": claim_amount,
-                "Exposure": float(record.get("Exposure") or 1.0),
-                "VehPower": float(record.get("VehPower") or 6.0),
-                "VehAge": float(record.get("VehAge") or 6.0),
-                "DrivAge": float(record.get("DrivAge") or 40.0),
-                "BonusMalus": float(record.get("BonusMalus") or 60.0),
-                "VehBrand": str(record.get("VehBrand") or "B12"),
-                "VehGas": str(record.get("VehGas") or "Regular"),
-                "Area": str(record.get("Area") or "C"),
-                "Density": float(record.get("Density") or 500.0),
-                "Region": str(record.get("Region") or "Centre"),
+                "Exposure": float(_get(record, "Exposure") or 1.0),
+                "VehPower": float(_get(record, "VehPower") or 6.0),
+                "VehAge": float(_get(record, "VehAge") or 6.0),
+                "DrivAge": float(_get(record, "DrivAge") or 40.0),
+                "BonusMalus": float(_get(record, "BonusMalus") or 60.0),
+                "VehBrand": str(_get(record, "VehBrand") or "B12"),
+                "VehGas": str(_get(record, "VehGas") or "Regular"),
+                "Area": str(_get(record, "Area") or "C"),
+                "Density": float(_get(record, "Density") or 500.0),
+                "Region": str(_get(record, "Region") or "Centre"),
             }
         )
     return pd.DataFrame(rows)
@@ -120,10 +150,28 @@ def main() -> None:
         print("ERROR: no usable policy rows after conversion.", file=sys.stderr)
         sys.exit(1)
 
-    # The pipeline expects the engineered feature columns to exist.
-    for column in INPUT_COLUMNS:
-        if column not in policy_df.columns:
-            policy_df[column] = np.nan
+    # Apply the same feature engineering used by the original training pipeline
+    # (adds LogDensity, fills/clips numeric columns, normalizes categoricals).
+    policy_df = engineer_features(policy_df)
+    policy_df["has_claim"] = (policy_df["ClaimNb"] > 0).astype(int)
+    if not severity_df.empty:
+        severity_df = engineer_features(severity_df)
+
+    # Blend in the bundled freMTPL2 baseline when present. This preserves the
+    # full feature space (Area A-F, brands, regions) that the frontend sends,
+    # while the Supabase portfolios contribute real-world outcomes.
+    if FREQUENCY_PATH.exists() and SEVERITY_PATH.exists():
+        print("Including bundled freMTPL2 baseline data...")
+        fremtpl_policy, fremtpl_severity, fremtpl_quality = prepare_model_datasets(
+            FREQUENCY_PATH, SEVERITY_PATH
+        )
+        policy_df = pd.concat([policy_df, fremtpl_policy], ignore_index=True)
+        severity_df = pd.concat([severity_df, fremtpl_severity], ignore_index=True)
+        policy_df["has_claim"] = (policy_df["ClaimNb"] > 0).astype(int)
+        print(
+            f"  freMTPL2: {fremtpl_quality['frequency_rows']} policies, "
+            f"{fremtpl_quality['claim_rows_used_for_severity_model']} claims"
+        )
 
     data_quality = {
         "frequency_rows": int(len(policy_df)),
