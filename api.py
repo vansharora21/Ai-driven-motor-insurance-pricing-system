@@ -148,8 +148,11 @@ def health() -> dict[str, Any]:
             "frequency_model": artifacts["metadata"].get("modeling_config", {}).get("models", {}).get("frequency_model"),
             "severity_model": artifacts["metadata"].get("modeling_config", {}).get("models", {}).get("severity_model"),
         }
-    except HTTPException:
-        return {"status": "degraded", "models_loaded": False}
+    except HTTPException as exc:
+        return {"status": "degraded", "models_loaded": False, "detail": exc.detail}
+    except Exception as exc:  # pragma: no cover - defensive
+        logger.exception("Health check failed")
+        return {"status": "error", "models_loaded": False, "detail": str(exc)}
 
 
 @app.post("/predict")
