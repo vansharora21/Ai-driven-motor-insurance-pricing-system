@@ -22,6 +22,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from src.data_loader import DataValidationError
+from src.db import save_quote, table_counts
 from src.model_artifacts import load_artifacts
 
 logger = logging.getLogger("motor-pricing-api")
@@ -65,10 +66,18 @@ class PolicyInput(BaseModel):
 
 class SinglePredictRequest(BaseModel):
     policy: PolicyInput
+    consent: bool = Field(
+        default=False,
+        description="True when the user consented to their anonymized quote being used for research/retraining.",
+    )
 
 
 class BatchPredictRequest(BaseModel):
     policies: list[PolicyInput] = Field(min_length=1)
+    consent: bool = Field(
+        default=False,
+        description="Applied to every policy in the batch.",
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -146,12 +155,29 @@ def health() -> dict[str, Any]:
 @app.post("/predict")
 def predict_single(request: SinglePredictRequest) -> dict[str, Any]:
     scored = _score_policies([request.policy])
-    return {"policy": _row_to_dict(scored.iloc[0])}
+    result = _row_to_dict(scored.iloc[0])
+    # Best-effort persistence: never fails the request if Supabase is down.
+    save_quote(
+        request.policy.model_dump(),
+        result,
+        source="single",
+        consent=request.consent,
+    )
+    return {"policy": result}
 
 
 @app.post("/predict/batch")
 def predict_batch(request: BatchPredictRequest) -> dict[str, Any]:
     scored = _score_policies(request.policies)
+    results = [_row_to_dict(row) for _, row in scored.iterrows()]
+
+    for policy, result in zip(request.policies, results):
+        save_quote(
+            policy.model_dump(),
+            result,
+            source="batch",
+            consent=request.consent,
+        )
 
     risk_counts = (
         scored["risk_category"]
@@ -161,7 +187,7 @@ def predict_batch(request: BatchPredictRequest) -> dict[str, Any]:
     )
 
     return {
-        "policies": [_row_to_dict(row) for _, row in scored.iterrows()],
+        "policies": results,
         "summary": {
             "total": int(len(scored)),
             "risk_counts": {key: int(risk_counts.get(key, 0)) for key in ["Low", "Medium", "High"]},
@@ -179,3 +205,9 @@ def model_info() -> dict[str, Any]:
         "metadata": artifacts["metadata"],
         "metrics": artifacts.get("metrics", {}),
     }
+
+
+@app.get("/data-stats")
+def data_stats() -> dict[str, Any]:
+    """Row counts per Supabase table (for the admin/flywheel dashboard)."""
+    return table_counts()

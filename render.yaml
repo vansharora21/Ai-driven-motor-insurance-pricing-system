@@ -17,3 +17,10 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.10.9
+      # Supabase credentials. Set these in the Render dashboard (or via
+      # "New -> Blueprint" env var prompts) after creating the project.
+      # The API degrades gracefully when they are absent (no quote saving).
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false

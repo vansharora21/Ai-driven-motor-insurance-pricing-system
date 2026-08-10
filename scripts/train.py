@@ -91,16 +91,22 @@ def _build_metadata(
     }
 
 
-def main() -> None:
-    """Train, evaluate, persist artifacts, and emit experiment-tracking outputs."""
+def run_training_pipeline(
+    policy_df: pd.DataFrame,
+    severity_df: pd.DataFrame,
+    data_quality: dict[str, int],
+) -> dict[str, object]:
+    """Train, evaluate, persist artifacts, and emit experiment-tracking outputs.
+
+    Accepts already-prepared policy/severity frames so the same pipeline can
+    retrain on Supabase-collected data (see scripts/retrain.py) or on the
+    bundled freMTPL2 dataset.
+    """
     modeling_config = load_modeling_config()
     random_seed = set_global_determinism(get_random_seed(modeling_config))
     evaluation_config = get_evaluation_config(modeling_config)
     experiment_config = get_experiment_config(modeling_config)
     pricing_config = get_pricing_config(modeling_config)
-
-    logger.info("Loading and preparing freMTPL2 datasets...")
-    policy_df, severity_df, data_quality = prepare_model_datasets()
 
     logger.info("Splitting frequency and severity training sets...")
     # Frequency model uses policy-level claim counts, stratified by claim occurrence.
@@ -270,6 +276,21 @@ def main() -> None:
         logger.info("Saved model comparison metrics to %s", comparison_path.resolve())
     logger.info("Saved premium report to %s", top_premiums_path.resolve())
     logger.info("Saved experiment run summary to %s", experiment_path.resolve())
+
+    return {
+        "metrics": metrics,
+        "metadata": metadata,
+        "experiment_path": experiment_path,
+        "comparison_path": comparison_path,
+        "top_premiums_path": top_premiums_path,
+    }
+
+
+def main() -> None:
+    """Train on the bundled freMTPL2 dataset and persist production artifacts."""
+    logger.info("Loading and preparing freMTPL2 datasets...")
+    policy_df, severity_df, data_quality = prepare_model_datasets()
+    run_training_pipeline(policy_df, severity_df, data_quality)
 
 
 if __name__ == "__main__":

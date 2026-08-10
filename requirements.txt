@@ -7,4 +7,5 @@ pydantic>=2.0.0
 scikit-learn
 seaborn
 streamlit>=1.25.0
+supabase>=2.4.0
 uvicorn>=0.29.0
