@@ -5,7 +5,6 @@ __pycache__
 .gitignore
 .ipynb_checkpoints
 logs
-models/*.joblib
 results
 *.pyc
 .env
