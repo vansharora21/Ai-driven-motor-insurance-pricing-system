@@ -32,6 +32,8 @@ artifacts/
 results/evaluation/
 results/plots/
 results/premium_reports/
+results/experiments/
+logs/
 
 # Local datasets and generated data files
 data/freMTPL2freq.csv
