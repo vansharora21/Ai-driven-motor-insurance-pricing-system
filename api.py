@@ -52,15 +52,15 @@ class PolicyInput(BaseModel):
     """Policy attributes accepted by the pricing models."""
 
     IDpol: int | None = None
-    Exposure: float = Field(gt=0, description="Policy exposure in years.")
-    VehPower: float = Field(gt=0, description="Vehicle horsepower class (1-20).")
-    VehAge: float = Field(ge=0, description="Vehicle age in years.")
-    DrivAge: float = Field(ge=18, description="Driver age in years.")
-    BonusMalus: float = Field(ge=50, description="Bonus-malus coefficient.")
+    Exposure: float = Field(gt=0, le=2.5, description="Policy exposure in years (max 2.5).")
+    VehPower: float = Field(gt=0, le=20, description="Vehicle horsepower class (1-20).")
+    VehAge: float = Field(ge=0, le=100, description="Vehicle age in years (max 100).")
+    DrivAge: float = Field(ge=18, le=100, description="Driver age in years (18-100).")
+    BonusMalus: float = Field(ge=50, le=350, description="Bonus-malus coefficient (50-350).")
     VehBrand: str = Field(min_length=1, description="Vehicle brand code (B1-B14).")
     VehGas: str = Field(min_length=1, description="Fuel type (Regular/Diesel).")
     Area: str = Field(min_length=1, description="Area risk segment (A-F).")
-    Density: float = Field(ge=0, description="Population density.")
+    Density: float = Field(ge=0, le=27000, description="Population density (max 27,000).")
     Region: str = Field(min_length=1, description="French region label.")
 
 
