@@ -1,0 +1,4 @@
+Exposure,VehPower,VehAge,DrivAge,BonusMalus,VehBrand,VehGas,Area,Density,Region
+1,6,4,50,50,B12,Regular,A,50,Centre
+1,6,6,45,100,B12,Regular,D,3000,Centre
+1,7,2,20,200,B12,Regular,F,8000,Ile-de-France
