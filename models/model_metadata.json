@@ -190,8 +190,8 @@
     }
   },
   "risk_thresholds": {
-    "low_max": 15000.0,
-    "medium_max": 40000.0
+    "low_max": 160.0,
+    "medium_max": 430.0
   },
   "portfolio_baselines": {
     "annual_frequency": 1.0,
@@ -199,15 +199,15 @@
     "annualized_expected_loss": 217.62297465530747
   },
   "pricing_config": {
-    "fx_rate_to_inr": 93.0,
+    "fx_rate_to_inr": 1.0,
     "expense_loading": 0.3,
-    "fixed_expense": 500.0,
-    "minimum_premium": 2500.0,
+    "fixed_expense": 30.0,
+    "minimum_premium": 100.0,
     "risk_score_scale": 100.0,
     "risk_score_baseline_floor": 1.0,
     "annualized_expected_loss_thresholds": {
-      "low_max": 15000.0,
-      "medium_max": 40000.0
+      "low_max": 160.0,
+      "medium_max": 430.0
     }
   },
   "modeling_config": {
@@ -325,15 +325,15 @@
       ]
     },
     "pricing": {
-      "fx_rate_to_inr": 93.0,
+      "fx_rate_to_inr": 1.0,
       "expense_loading": 0.3,
-      "fixed_expense": 500.0,
-      "minimum_premium": 2500.0,
+      "fixed_expense": 30.0,
+      "minimum_premium": 100.0,
       "risk_score_scale": 100.0,
       "risk_score_baseline_floor": 1.0,
       "annualized_expected_loss_thresholds": {
-        "low_max": 15000.0,
-        "medium_max": 40000.0
+        "low_max": 160.0,
+        "medium_max": 430.0
       }
     }
   },

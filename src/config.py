@@ -102,18 +102,18 @@ DEFAULT_MODELING_CONFIG: dict[str, Any] = {
         ],
     },
     "pricing": {
-        # The models are trained on French freMTPL2 data (EUR). For the Indian
-        # market we convert monetary outputs to INR at pricing time. This is an
-        # explicit FX conversion until real Indian claim data retrains severity.
-        "fx_rate_to_inr": 93.0,
+        # French-only demo: the models are trained on freMTPL2 (EUR), so monetary
+        # outputs are already in euros and the FX multiplier is 1.0. Loadings and
+        # risk bands are set at euro levels (fixed expense ~EUR 30, min premium 100).
+        "fx_rate_to_inr": 1.0,
         "expense_loading": 0.30,
-        "fixed_expense": 500.0,
-        "minimum_premium": 2500.0,
+        "fixed_expense": 30.0,
+        "minimum_premium": 100.0,
         "risk_score_scale": 100.0,
         "risk_score_baseline_floor": 1.0,
         "annualized_expected_loss_thresholds": {
-            "low_max": 15000.0,
-            "medium_max": 40000.0,
+            "low_max": 160.0,
+            "medium_max": 430.0,
         },
     },
 }

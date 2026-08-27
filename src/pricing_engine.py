@@ -92,8 +92,8 @@ def calculate_premium(
     if pricing_config:
         pricing.update(pricing_config)
 
-    # Models are trained on EUR data; convert monetary outputs to INR for the
-    # Indian market. Frequency is unitless (claims/year) and stays unchanged.
+    # Models are trained on EUR data (French freMTPL2). The demo prices in EUR,
+    # so the FX multiplier is 1.0; frequency is unitless and stays unchanged.
     fx_rate = float(pricing.get("fx_rate_to_inr", 1.0))
 
     scored_df = df.copy()
